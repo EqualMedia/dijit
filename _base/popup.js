@@ -79,7 +79,8 @@ dijit.popup = {
 	//		Cache of wrapper nodes and iframes.  Each element in this
 	//		array is a [div, iframe].
 	_wrappers: [],
-
+	
+	_popupClass: "dijitPopup",
 
 	moveOffScreen: function(/*DomNode*/ node){
 		// summary:
@@ -146,7 +147,7 @@ dijit.popup = {
 		var wrapperobj = this._wrappers.pop(), wrapper, iframe;
 		if(!wrapperobj){
 			wrapper = dojo.create("div",{
-				"class":"dijitPopup"
+				"class":this._popupClass
 			}, dojo.body());
 			dijit.setWaiRole(wrapper, "presentation");
 		}else{
@@ -164,7 +165,7 @@ dijit.popup = {
 				// prevent transient scrollbar causing misalign (#5776), and initial flash in upper left (#10111)
 				top: "-9999px"
 			},
-			"class": "dijitPopup " + (widget.baseClass || widget["class"] || "").split(" ")[0] +"Popup",
+			"class": this._popupClass + " " + (widget.baseClass || widget["class"] || "").split(" ")[0] +"Popup",
 			dijitPopupParent: args.parent ? args.parent.id : ""
 		});
 
