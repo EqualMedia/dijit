@@ -9,8 +9,7 @@
 		</style>
 
 		<!-- required: dojo.js -->
-		<script type="text/javascript" src="../../../../dojo/dojo.js"
-			djConfig="isDebug: true, parseOnLoad: true"></script>
+		<script type="text/javascript" src="../../../../dojo/dojo.js"></script>
 
 		<script type="text/javascript" src="../../helpers.js"></script>
 
@@ -35,6 +34,16 @@
 				});
 
 				doh.register("dijit.form.Button", [
+					{
+						name: "label",
+						timeout: 1000,
+						runTest: function(){
+							var label = dijit.byId("T1465").containerNode.innerHTML;
+							doh.is('Create', dojo.trim(label), "source.innerHTML label " + label);
+							var label = dijit.byId("T1466").containerNode.innerHTML;
+							doh.is('View', label, "subclass label " + label);
+						}
+					},
 					{
 						name: "enabled",
 						timeout: 5000,

@@ -6,6 +6,7 @@ define([
 	"../Menu",
 	"../MenuItem",
 	"dojo/i18n!../nls/common",
+	"dojo/_base/declare", // dojo.declare
 	"dojo/_base/html", // dojo.attr dojo.setSelectable dojo.toggleClass
 	"dojo/_base/lang", // dojo.hitch dojo.trim
 	"dojo/i18n" // dojo.i18n.getLocalization
@@ -27,6 +28,8 @@ dojo.declare("dijit.layout.TabController", dijit.layout.StackController, {
 	//		added or deleted updates itself accordingly.
 	// tags:
 	//		private
+
+	baseClass: "dijitTabController",
 
 	templateString: "<div role='tablist' dojoAttachEvent='onkeypress:onkeypress'></div>",
 

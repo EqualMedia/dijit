@@ -51,7 +51,7 @@ define([
 			//		Display tooltip w/specified contents to right of specified node
 			//		(To left if there's no space on the right, or if rtl == true)
 
-			if(this.aroundNode && this.aroundNode === aroundNode){
+			if(this.aroundNode && this.aroundNode === aroundNode && this.containerNode.innerHTML == innerHTML){
 				return;
 			}
 
@@ -250,30 +250,31 @@ define([
 		//		See description of `dijit.Tooltip.defaultPosition` for details on position parameter.
 		position: [],
 
-		_setConnectIdAttr: function(/*String*/ newId){
+		_setConnectIdAttr: function(/*String|String[]*/ newId){
 			// summary:
-			//		Connect to node(s) (specified by id)
+			//		Connect to specified node(s)
 
 			// Remove connections to old nodes (if there are any)
 			dojo.forEach(this._connections || [], function(nested){
 				dojo.forEach(nested, dojo.hitch(this, "disconnect"));
 			}, this);
 
-			// Make connections to nodes in newIds.
-			var ary = dojo.isArrayLike(newId) ? newId : (newId ? [newId] : []);
-			this._connections = dojo.map(ary, function(id){
+			// Make array of id's to connect to, excluding entries for nodes that don't exist yet, see startup()
+			this._connectIds = dojo.filter(dojo.isArrayLike(newId) ? newId : (newId ? [newId] : []),
+					function(id){ return dojo.byId(id); });
+
+			// Make connections
+			this._connections = dojo.map(this._connectIds, function(id){
 				var node = dojo.byId(id);
-				return node ? [
-					this.connect(node, "onmouseenter", "_onTargetMouseEnter"),
-					this.connect(node, "onmouseleave", "_onTargetMouseLeave"),
-					this.connect(node, "onfocus", "_onTargetFocus"),
-					this.connect(node, "onblur", "_onTargetBlur")
-				] : [];
+				return [
+					this.connect(node, "onmouseenter", "_onHover"),
+					this.connect(node, "onmouseleave", "_onUnHover"),
+					this.connect(node, "onfocus", "_onHover"),
+					this.connect(node, "onblur", "_onUnHover")
+				];
 			}, this);
 
 			this._set("connectId", newId);
-
-			this._connectIds = ary;	// save as array
 		},
 
 		addTarget: function(/*DOMNODE || String*/ node){
@@ -315,42 +316,6 @@ define([
 			// didn't exist during the widget's initialization, then connect now.
 			var ids = this.connectId;
 			dojo.forEach(dojo.isArrayLike(ids) ? ids : [ids], this.addTarget, this);
-		},
-
-		_onTargetMouseEnter: function(/*Event*/ e){
-			// summary:
-			//		Handler for mouseenter event on the target node
-			// tags:
-			//		private
-			this._onHover(e);
-		},
-
-		_onTargetMouseLeave: function(/*Event*/ e){
-			// summary:
-			//		Handler for mouseleave event on the target node
-			// tags:
-			//		private
-			this._onUnHover(e);
-		},
-
-		_onTargetFocus: function(/*Event*/ e){
-			// summary:
-			//		Handler for focus event on the target node
-			// tags:
-			//		private
-
-			this._focus = true;
-			this._onHover(e);
-		},
-
-		_onTargetBlur: function(/*Event*/ e){
-			// summary:
-			//		Handler for blur event on the target node
-			// tags:
-			//		private
-
-			this._focus = false;
-			this._onUnHover(e);
 		},
 
 		_onHover: function(/*Event*/ e){

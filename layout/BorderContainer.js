@@ -1,6 +1,7 @@
 define([
-	"dojo/_base/kernel", // dojo.getObject
+	"dojo/_base/kernel", // lang.getObject
 	"..",
+	"dojo/_base/lang", // dojo.hitch
 	"dojo/touch",
 	"dojo/cookie", // dojo.cookie
 	"../_WidgetBase",
@@ -8,11 +9,11 @@ define([
 	"./_LayoutWidget",
 	"dojo/_base/array", // dojo.filter dojo.forEach dojo.map
 	"dojo/_base/connect", // dojo.connect dojo.disconnect dojo.keys
+	"dojo/_base/declare", // dojo.declare
 	"dojo/_base/event", // dojo.stopEvent
 	"dojo/_base/html", // dojo.addClass dojo.destroy dojo.getComputedStyle dojo.marginBox dojo.place dojo.removeClass dojo.style dojo.toggleClass
-	"dojo/_base/lang", // dojo.hitch
 	"dojo/_base/window" // dojo.body dojo.doc dojo.doc.createElement
-], function(dojo, dijit, touch){
+], function(dojo, dijit, lang, touch){
 
 // module:
 //		dijit/layout/BorderContainer
@@ -107,7 +108,7 @@ dojo.declare("dijit.layout.BorderContainer", dijit.layout._LayoutWidget, {
 			// or alternately if splitter=false but BorderContainer.gutters=true then
 			// insert dummy div just for spacing
 			if(region != "center" && (child.splitter || this.gutters) && !child._splitterWidget){
-				var _Splitter = dojo.getObject(child.splitter ? this._splitterClass : "dijit.layout._Gutter");
+				var _Splitter = lang.getObject(child.splitter ? this._splitterClass : "dijit.layout._Gutter");
 				var splitter = new _Splitter({
 					id: child.id + "_splitter",
 					container: this,
@@ -150,7 +151,7 @@ dojo.declare("dijit.layout.BorderContainer", dijit.layout._LayoutWidget, {
 			delete child._splitterWidget;
 		}
 		this.inherited(arguments);
-		
+
 		if(this._started){
 			this._layoutChildren();
 		}

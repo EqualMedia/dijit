@@ -9,8 +9,8 @@
 	</style>
 
 	<!-- required: dojo.js -->
-	<script type="text/javascript" src="../../../../dojo/dojo.js"
-		djConfig="isDebug: true, parseOnLoad: true"></script>
+	<script type="text/javascript" src="../../../../dojo/dojo.js"></script>
+
 	<script type="text/javascript" src="../../helpers.js"></script>
 
 	<script type="text/javascript">
@@ -116,7 +116,7 @@
 							// watch() tests
 							doh.is(expectedText, dv, "watch of displayedValue");
 							doh.is(value, v, "watch of value");
-							doh.is(value, isComboBox ? combo.store.getValue(i, combo.searchAttr) : combo.store.getIdentity(i), "watch of item");
+							doh.is(value, isComboBox ? i[combo.searchAttr] : combo.store.getIdentity(i), "watch of item");
 							h1.unwatch();
 							h2.unwatch();
 							h3.unwatch();
@@ -274,6 +274,35 @@
 				}
 
 				// TODO: test some other set("value") calls
+			]);
+
+			doh.register("back compat", [
+				function fetch_optionTags(){
+					// Make sure that myComboBox.store.fetch() still works even though
+					// ComboBox is using the new dojo.store API
+					var d = new doh.Deferred();
+					doh.t(dijit.byId("setvaluetest").store, "store exists");
+					doh.t(dojo.isFunction(dijit.byId("setvaluetest").store.fetch), "fetch exists");
+					dijit.byId("setvaluetest").store.fetch({
+						onBegin: d.getTestCallback(function(total){
+							doh.is(61, total, "# records");
+						})
+					});
+					return d;
+				},
+				function fetch_externalStore(){
+					// Make sure that myComboBox.store.fetch() still works even though
+					// ComboBox is using the new dojo.store API
+					var d = new doh.Deferred();
+					doh.t(dijit.byId("datatest").store, "store exists");
+					doh.t(dojo.isFunction(dijit.byId("datatest").store.fetch), "fetch exists");
+					dijit.byId("datatest").store.fetch({
+						onBegin: d.getTestCallback(function(total){
+							doh.is(61, total, "# records");
+						})
+					});
+					return d;
+				}
 			]);
 
 			doh.register("direct input", [

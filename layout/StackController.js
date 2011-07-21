@@ -1,6 +1,7 @@
 define([
-	"dojo/_base/kernel", // dojo.getObject
+	"dojo/_base/kernel", // lang.getObject
 	"..",
+	"dojo/_base/lang", // lang.getObject
 	"../_Widget",
 	"../_TemplatedMixin",
 	"../_Container",
@@ -11,9 +12,8 @@ define([
 	"dojo/_base/connect", // dojo.keys
 	"dojo/_base/declare", // dojo.declare
 	"dojo/_base/event", // dojo.stopEvent
-	"dojo/_base/lang", // dojo.hitch
 	"dojo/_base/sniff" // dojo.isIE
-], function(dojo, dijit){
+], function(dojo, dijit, lang){
 
 	// module:
 	//		dijit/layout/StackController
@@ -28,7 +28,9 @@ define([
 		//		Monitors the specified StackContainer, and whenever a page is
 		//		added, deleted, or selected, updates itself accordingly.
 
-		templateString: "<span role='tablist' dojoAttachEvent='onkeypress' class='dijitStackController'></span>",
+		baseClass: "dijitTabController",
+
+		templateString: "<span role='tablist' dojoAttachEvent='onkeypress'></span>",
 
 		// containerId: [const] String
 		//		The id of the page container that I point to
@@ -83,7 +85,7 @@ define([
 			//		private
 
 			// create an instance of the button widget
-			var cls = dojo.getObject(this.buttonWidget);
+			var cls = lang.getObject(this.buttonWidget);
 			var button = new cls({
 				id: this.id + "_" + page.id,
 				label: page.title,

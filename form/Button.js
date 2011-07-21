@@ -7,6 +7,7 @@ define([
 	"./_ButtonMixin",
 	"../_Container",
 	"../_HasDropDown",
+	"dojo/_base/declare", // dojo.declare
 	"dojo/_base/html", // dojo.toggleClass
 	"dojo/_base/lang" // dojo.trim
 ], function(dojo, dijit, template, require){
@@ -73,7 +74,10 @@ dojo.declare("dijit.form.Button", [dijit.form._FormWidget, dijit.form._ButtonMix
 		// this.params.label, handle it here.
 		// TODO: remove the method in 2.0, parser will do it all for me
 		if(source && (!this.params || !("label" in this.params))){
-			this.set('label', source.innerHTML);
+			var sourceLabel = dojo.trim(source.innerHTML);
+			if(sourceLabel){
+				this.label = sourceLabel; // _applyAttributes will be called after buildRendering completes to update the DOM
+			}
 		}
 	},
 
@@ -108,7 +112,8 @@ dojo.declare("dijit.form.Button", [dijit.form._FormWidget, dijit.form._ButtonMix
 // Back compat w/1.6, remove for 2.0
 if(!dojo.isAsync){
 	dojo.ready(0, function(){
-		require(["dijit/form/DropDownButton", "dijit/form/ComboButton", "dijit/form/ToggleButton"]);
+		var requires = ["dijit/form/DropDownButton", "dijit/form/ComboButton", "dijit/form/ToggleButton"];
+		require(requires);	// use indirection so modules not rolled into a build
 	});
 }
 

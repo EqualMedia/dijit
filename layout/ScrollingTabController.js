@@ -8,8 +8,8 @@ define([
 	"../Menu",
 	"../form/Button",
 	"../_HasDropDown",
-	"dojo/_base/NodeList", // .filter
 	"dojo/_base/array", // dojo.forEach
+	"dojo/_base/declare", // dojo.declare
 	"dojo/_base/html", // dojo.addClass dojo.contentBox dojo.hasClass dojo.style
 	"dojo/_base/lang", // dojo.hitch
 	"dojo/_base/sniff", // dojo.isIE dojo.isQuirks dojo.isWebKit
@@ -32,6 +32,8 @@ dojo.declare("dijit.layout.ScrollingTabController", [dijit.layout.TabController,
 	//		or right).
 	// tags:
 	//		private
+
+	baseClass: "dijitTabController dijitScrollingTabController",
 
 	templateString: tabControllerTemplate,
 
@@ -166,10 +168,6 @@ dojo.declare("dijit.layout.ScrollingTabController", [dijit.layout.TabController,
 		// summary:
 		//		Hides or displays the buttons used to scroll the tab list and launch the menu
 		//		that selects tabs.
-
-		if(this.domNode.offsetWidth == 0){
-			return;
-		}
 
 		// Save the dimensions to be used when a child is renamed.
 		this._dim = dim;
