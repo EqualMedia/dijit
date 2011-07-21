@@ -13,7 +13,7 @@ define([
 	//		Code to place a popup relative to another node
 
 
-	function _place(/*DomNode*/ node, choices, layoutNode, aroundNodeCoords){
+	function _place(/*DomNode*/ node, choices, layoutNode, aroundNodeCoords, preserveDomPosition){
 		// summary:
 		//		Given a list of spots to put node, put it at the first spot where it fits,
 		//		of if it doesn't fit anywhere then the place with the least overflow
@@ -37,7 +37,7 @@ define([
 		// This won't work if the node is inside a <div style="position: relative">,
 		// so reattach it to dojo.doc.body.	 (Otherwise, the positioning will be wrong
 		// and also it might get cutoff)
-		if(!node.parentNode || String(node.parentNode.tagName).toLowerCase() != "body"){
+		if(preserveDomPosition !== true && (!node.parentNode || String(node.parentNode.tagName).toLowerCase() != "body")){
 			dojo.body().appendChild(node);
 		}
 
@@ -175,7 +175,7 @@ define([
 		//		Code to place a DOMNode relative to another DOMNode.
 		//		Load using require(["dijit/place"], function(place){ ... }).
 
-		at: function(node, pos, corners, padding){
+		at: function(node, pos, corners, padding, preserveDomPosition){
 			// summary:
 			//		Positions one of the node's corners at specified position
 			//		such that node is fully visible in viewport.
@@ -194,6 +194,8 @@ define([
 			//			* "TR" - top right
 			// padding: dijit.place.__Position?
 			//		optional param to set padding, to put some buffer around the element you want to position.
+			// preserveDomPosition:
+			//		If true, does not try to place node in the body.
 			// example:
 			//		Try to place node's top right corner at (10,20).
 			//		If that makes node go (partially) off screen, then try placing
@@ -208,7 +210,7 @@ define([
 				return c;
 			});
 
-			return _place(node, choices);
+			return _place(node, choices, null, null, preserveDomPosition);
 		},
 
 		around: function(
@@ -216,7 +218,8 @@ define([
 			/*DomNode || dijit.place.__Rectangle*/ anchor,
 			/*String[]*/	positions,
 			/*Boolean*/		leftToRight,
-			/*Function?*/	layoutNode){
+			/*Function?*/	layoutNode,
+			/*Boolean?*/	preserveDomPosition){
 
 			// summary:
 			//		Position node adjacent or kitty-corner to anchor
@@ -247,6 +250,9 @@ define([
 			// leftToRight:
 			//		True if widget is LTR, false if widget is RTL.   Affects the behavior of "above" and "below"
 			//		positions slightly.
+			//
+			// preserveDomPosition:
+			//		If true, does not try to place node in the body.
 			//
 			// example:
 			//	|	placeAroundNode(node, aroundNode, {'BL':'TL', 'TR':'BR'});
@@ -325,7 +331,7 @@ define([
 				}
 			});
 
-			return _place(node, choices, layoutNode, {w: width, h: height});
+			return _place(node, choices, layoutNode, {w: width, h: height}, preserveDomPosition);
 		}
 	};
 
