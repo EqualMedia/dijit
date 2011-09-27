@@ -16,7 +16,7 @@
 		<script type="text/javascript">
 			dojo.require("dijit.robotx");
 
-			dojo.addOnLoad(function(){
+			dojo.ready(function(){
 				doh.robot.initRobot('../test_Button.html');
 
 				var submitCount = 0, resetCount = 0;
@@ -40,8 +40,8 @@
 						runTest: function(){
 							var label = dijit.byId("T1465").containerNode.innerHTML;
 							doh.is('Create', dojo.trim(label), "source.innerHTML label " + label);
-							var label = dijit.byId("T1466").containerNode.innerHTML;
-							doh.is('View', label, "subclass label " + label);
+							var label2 = dijit.byId("T1466").containerNode.innerHTML;
+							doh.is('View', label2, "subclass label " + label2);
 						}
 					},
 					{

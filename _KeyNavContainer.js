@@ -11,7 +11,6 @@ define([
 ], function(kernel, _Container, _FocusMixin, array, keys, declare, event, domAttr, lang){
 
 /*=====
-	var declare = dojo.declare;
 	var _FocusMixin = dijit._FocusMixin;
 	var _Container = dijit._Container;
 =====*/
@@ -215,7 +214,7 @@ define([
 			}
 		},
 
-		_onChildBlur: function(/*dijit._Widget*/ widget){
+		_onChildBlur: function(/*dijit._Widget*/ /*===== widget =====*/){
 			// summary:
 			//		Called when focus leaves a child widget to go
 			//		to a sibling widget.

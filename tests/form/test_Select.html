@@ -81,7 +81,7 @@
 				return ("<span class=\"dijitReset dijitInline dijitSelectLabel\">" + expected + "</span>").toLowerCase().replace(/ */g, "");
 			}
 
-			dojo.addOnLoad(function(){
+			dojo.ready(function(){
 				dojo.connect(s1, "onChange", function(val){
 					console.log("First Select Changed to " + val);
 					numChanges++;
@@ -262,7 +262,7 @@
 							});
 
 							s3.set("required", false);
-							doh.is("", stateWatch, "watch fired after set requried=true")
+							doh.is("", stateWatch, "watch fired after set requried=true");
 
 							s3.set("required", true);
 							doh.is("Incomplete", stateWatch, "watch fired after set required=false''");

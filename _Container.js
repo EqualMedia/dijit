@@ -1,13 +1,9 @@
 define([
-	".",	// byNode()
 	"dojo/_base/array", // array.forEach array.indexOf
 	"dojo/_base/declare", // declare
-	"dojo/dom-construct" // domConstruct.place
-], function(dijit, array, declare, domConstruct){
-
-/*=====
-	var declare = dojo.declare;
-=====*/
+	"dojo/dom-construct", // domConstruct.place
+	"./registry"	// registry.byNode()
+], function(array, declare, domConstruct, registry){
 
 	// module:
 	//		dijit/_Container
@@ -28,17 +24,11 @@ define([
 		//		this.containerNode.   In that case calls like addChild(node, position)
 		//		wouldn't make sense.
 
-		// isContainer: [protected] Boolean
-		//		Indicates that this widget acts as a "parent" to the descendant widgets.
-		//		When the parent is started it will call startup() on the child widgets.
-		//		See also `isLayoutContainer`.
-		isContainer: true,
-
 		buildRendering: function(){
 			this.inherited(arguments);
 			if(!this.containerNode){
 				// all widgets with descendants must set containerNode
-	 				this.containerNode = this.domNode;
+	 			this.containerNode = this.domNode;
 			}
 		},
 
@@ -92,13 +82,6 @@ define([
 			return this.getChildren().length > 0;	// Boolean
 		},
 
-		destroyDescendants: function(/*Boolean*/ preserveDom){
-			// summary:
-			//      Destroys all the widgets inside this.containerNode,
-			//      but not this widget itself
-			array.forEach(this.getChildren(), function(child){ child.destroyRecursive(preserveDom); });
-		},
-
 		_getSiblingOfChild: function(/*dijit._Widget*/ child, /*int*/ dir){
 			// summary:
 			//		Get the next or previous widget sibling of child
@@ -111,34 +94,14 @@ define([
 				which = (dir>0 ? "nextSibling" : "previousSibling");
 			do{
 				node = node[which];
-			}while(node && (node.nodeType != 1 || !dijit.byNode(node)));
-			return node && dijit.byNode(node);	// dijit._Widget
+			}while(node && (node.nodeType != 1 || !registry.byNode(node)));
+			return node && registry.byNode(node);	// dijit._Widget
 		},
 
 		getIndexOfChild: function(/*dijit._Widget*/ child){
 			// summary:
 			//		Gets the index of the child in this container or -1 if not found
 			return array.indexOf(this.getChildren(), child);	// int
-		},
-
-		startup: function(){
-			// summary:
-			//		Called after all the widgets have been instantiated and their
-			//		dom nodes have been inserted somewhere under win.doc.body.
-			//
-			//		Widgets should override this method to do any initialization
-			//		dependent on other widgets existing, and then call
-			//		this superclass method to finish things off.
-			//
-			//		startup() in subclasses shouldn't do anything
-			//		size related because the size of the widget hasn't been set yet.
-
-			if(this._started){ return; }
-
-			// Startup all children of this widget
-			array.forEach(this.getChildren(), function(child){ child.startup(); });
-
-			this.inherited(arguments);
 		}
 	});
 });

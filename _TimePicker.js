@@ -17,11 +17,10 @@ define([
 	"./_TemplatedMixin",
 	"./form/_FormValueWidget",
 	"dojo/text!./templates/TimePicker.html"
-], function(array, date, locale, stamp, declare, domClass, domConstruct, event, kernel, keys, lang, has, query,
+], function(array, ddate, locale, stamp, declare, domClass, domConstruct, event, kernel, keys, lang, has, query,
 			typematic, _Widget, _TemplatedMixin, _FormValueWidget, template){
 
 /*=====
-	var declare = dojo.declare;
 	var _Widget = dijit._Widget;
 	var _TemplatedMixin = dijit._TemplatedMixin;
 	var _FormValueWidget = dijit.form._FormValueWidget;
@@ -157,9 +156,11 @@ define([
 			this._showText();
 		},
 
-		isDisabledDate: function(/*Date*/ dateObject, /*String?*/ locale){
+		isDisabledDate: function(/*===== dateObject, locale =====*/){
 			// summary:
 			//		May be overridden to disable certain dates in the TimePicker e.g. `isDisabledDate=locale.isWeekend`
+			// dateObject: Date
+			// locale: String?
 			// type:
 			//		extension
 			return false; // Boolean
@@ -319,7 +320,7 @@ define([
 				// set disabled
 				domClass.add(div, this.baseClass+"ItemDisabled");
 			}
-			if(this.value && !date.compare(this.value, date, this.constraints.selector)){
+			if(this.value && !ddate.compare(this.value, date, this.constraints.selector)){
 				div.selected = true;
 				domClass.add(div, this.baseClass+"ItemSelected");
 				if(domClass.contains(div, this.baseClass+"Marker")){
@@ -347,7 +348,7 @@ define([
 			this.onChange(tdate);
 		},
 
-		onChange: function(/*Date*/ time){
+		onChange: function(/*Date*/ /*===== time =====*/){
 			// summary:
 			//		Notification that a time was selected.  It may be the same as the previous value.
 			// tags:

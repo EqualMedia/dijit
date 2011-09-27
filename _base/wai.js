@@ -1,9 +1,9 @@
 define([
-	"..",
-	"dojo/_base/lang", // lang.mixin
 	"dojo/dom-attr", // domAttr.attr
+	"dojo/_base/lang", // lang.mixin
+	"..",	// export symbols to dijit
 	"../hccss"			// not using this module directly, but loading it sets CSS flag on <html>
-], function(dijit, lang, domAttr){
+], function(domAttr, lang, dijit){
 
 	// module:
 	//		dijit/_base/wai
@@ -13,9 +13,7 @@ define([
 	//
 	//		Also loads hccss to apply dijit_a11y class to root node if machine is in high-contrast mode.
 
-	var mixin = lang.mixin;		/*===== mixin = dojo.mixin; =====*/
-
-	mixin(dijit, {
+	lang.mixin(dijit, {
 		hasWaiRole: function(/*Element*/ elem, /*String?*/ role){
 			// summary:
 			//		Determines if an element has a particular role.

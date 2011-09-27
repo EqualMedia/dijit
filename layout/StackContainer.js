@@ -1,19 +1,18 @@
 define([
+	"dojo/_base/array", // array.forEach array.indexOf array.some
 	"dojo/cookie", // cookie
-	"dojo/i18n!../nls/common",
+	"dojo/_base/declare", // declare
+	"dojo/dom-class", // domClass.add domClass.replace
+	"dojo/_base/lang",	// lang.extend
+	"dojo/topic", // publish
+	"../registry",	// registry.byId
 	"../_WidgetBase",
 	"./_LayoutWidget",
-	"./StackController",
-	"dojo/_base/array", // array.forEach array.indexOf array.some
-	"dojo/_base/connect", // connect.publish
-	"dojo/_base/declare", // declare
-	"dojo/_base/lang",
-	"dojo/dom-class" // domClass.add domClass.replace
-], function(cookie, nlsCommon, _WidgetBase, _LayoutWidget, StackController,
-	array, connect, declare, lang, domClass){
+	"dojo/i18n!../nls/common"
+], function(array, cookie, declare, domClass, lang, topic,
+			registry, _WidgetBase, _LayoutWidget){
 
 /*=====
-var declare = dojo.declare;
 var _WidgetBase = dijit._WidgetBase;
 var _LayoutWidget = dijit.layout._LayoutWidget;
 var StackController = dijit.layout.StackController;
@@ -28,8 +27,7 @@ var StackController = dijit.layout.StackController;
 // These arguments can be specified for the children of a StackContainer.
 // Since any widget can be specified as a StackContainer child, mix them
 // into the base widget class.  (This is a hack, but it's effective.)
-var extend = lang.extend;		/*===== extend = dojo.extend; =====*/
-extend(_WidgetBase, {
+lang.extend(_WidgetBase, {
 	// selected: Boolean
 	//		Parameter for children of `dijit.layout.StackContainer` or subclasses.
 	//		Specifies that this widget should be the initially displayed pane.
@@ -104,7 +102,7 @@ return declare("dijit.layout.StackContainer", _LayoutWidget, {
 
 		// Figure out which child to initially display, defaulting to first one
 		if(this.persist){
-			this.selectedChildWidget = dijit.byId(cookie(this.id + "_selectedChild"));
+			this.selectedChildWidget = registry.byId(cookie(this.id + "_selectedChild"));
 		}else{
 			array.some(children, function(child){
 				if(child.selected){
@@ -122,7 +120,7 @@ return declare("dijit.layout.StackContainer", _LayoutWidget, {
 		// Publish information about myself so any StackControllers can initialize.
 		// This needs to happen before this.inherited(arguments) so that for
 		// TabContainer, this._contentBox doesn't include the space for the tab labels.
-		connect.publish(this.id+"-startup", [{children: children, selected: selected}]);
+		topic.emit(this.id+"-startup", {children: children, selected: selected});
 
 		// Startup each child widget, and do initial layout like setting this._contentBox,
 		// then calls this.resize() which does the initial sizing on the selected child.
@@ -131,12 +129,14 @@ return declare("dijit.layout.StackContainer", _LayoutWidget, {
 
 	resize: function(){
 		// Resize is called when we are first made visible (it's called from startup()
-		// if we are initially visible).  If this is the first time we've been made
+		// if we are initially visible). If this is the first time we've been made
 		// visible then show our first child.
-		var selected = this.selectedChildWidget;
-		if(selected && !this._hasBeenShown){
+		if(!this._hasBeenShown){
 			this._hasBeenShown = true;
-			this._showChild(selected);
+			var selected = this.selectedChildWidget;
+			if(selected){
+				this._showChild(selected);
+			}
 		}
 		this.inherited(arguments);
 	},
@@ -159,13 +159,15 @@ return declare("dijit.layout.StackContainer", _LayoutWidget, {
 		this.inherited(arguments);
 
 		if(this._started){
-			connect.publish(this.id+"-addChild", [child, insertIndex]);
+			topic.emit(this.id+"-addChild", child, insertIndex);	// publish
 
 			// in case the tab titles have overflowed from one line to two lines
 			// (or, if this if first child, from zero lines to one line)
 			// TODO: w/ScrollingTabController this is no longer necessary, although
 			// ScrollTabController.resize() does need to get called to show/hide
-			// the navigation buttons as appropriate, but that's handled in ScrollingTabController.onAddChild()
+			// the navigation buttons as appropriate, but that's handled in ScrollingTabController.onAddChild().
+			// If this is updated to not layout [except for initial child added / last child removed], update
+			// "childless startup" test in StackContainer.html to check for no resize event after second addChild()
 			this.layout();
 
 			// if this is the first child, then select it
@@ -182,12 +184,12 @@ return declare("dijit.layout.StackContainer", _LayoutWidget, {
 
 		if(this._started){
 			// this will notify any tablists to remove a button; do this first because it may affect sizing
-			connect.publish(this.id + "-removeChild", [page]);
+			topic.emit(this.id + "-removeChild", page);	// publish
 		}
 
-		// If we are being destroyed than don't run the code below (to select another page), because we are deleting
-		// every page one by one
-		if(this._beingDestroyed){ return; }
+		// If all our children are being destroyed than don't run the code below (to select another page),
+		//  because we are deleting every page one by one
+		if(this._descendantsBeingDestroyed){ return; }
 
 		// Select new page to display, also updating TabController to show the respective tab.
 		// Do this before layout call because it can affect the height of the TabController.
@@ -215,13 +217,13 @@ return declare("dijit.layout.StackContainer", _LayoutWidget, {
 		// page:
 		//		Reference to child widget or id of child widget
 
-		page = dijit.byId(page);
+		page = registry.byId(page);
 
 		if(this.selectedChildWidget != page){
 			// Deselect old page and select new one
 			var d = this._transition(page, this.selectedChildWidget, animate);
 			this._set("selectedChildWidget", page);
-			connect.publish(this.id+"-selectChild", [page]);
+			topic.emit(this.id+"-selectChild", page);	// publish
 
 			if(this.persist){
 				cookie(this.id + "_selectedChild", this.selectedChildWidget.id);
@@ -231,10 +233,16 @@ return declare("dijit.layout.StackContainer", _LayoutWidget, {
 		return d;		// If child has an href, promise that fires when the child's href finishes loading
 	},
 
-	_transition: function(/*dijit._Widget*/ newWidget, /*dijit._Widget*/ oldWidget, /*Boolean*/ animate){
+	_transition: function(newWidget, oldWidget /*===== ,  animate =====*/){
 		// summary:
 		//		Hide the old widget and display the new widget.
 		//		Subclasses should override this.
+		// newWidget: dijit._Widget
+		//		The newly selected widget.
+		// oldWidget: dijit._Widget
+		//		The previously selected widget.
+		// animate: Boolean
+		//		Used by AccordionContainer to turn on/off slide effect.
 		// tags:
 		//		protected extension
 		if(oldWidget){
@@ -280,7 +288,7 @@ return declare("dijit.layout.StackContainer", _LayoutWidget, {
 	},
 
 	_onKeyPress: function(e){
-		connect.publish(this.id+"-containerKeyPress", [{ e: e, page: this}]);
+		topic.emit(this.id+"-containerKeyPress", { e: e, page: this});	// publish
 	},
 
 	layout: function(){
@@ -336,10 +344,14 @@ return declare("dijit.layout.StackContainer", _LayoutWidget, {
 	},
 
 	destroyDescendants: function(/*Boolean*/ preserveDom){
+		this._descendantsBeingDestroyed = true;
 		array.forEach(this.getChildren(), function(child){
-			this.removeChild(child);
+			if(!preserveDom){
+				this.removeChild(child);
+			}
 			child.destroyRecursive(preserveDom);
 		}, this);
+		this._descendantsBeingDestroyed = false;
 	}
 });
 

@@ -1,10 +1,9 @@
 define([
 	"require",			// require.toUrl
-	"./_base/manager",
 	"dojo/_base/array", // array.forEach array.map
 	"dojo/aspect",
 	"dojo/_base/config", // config.blankGif
-	"dojo/_base/connect", // connect.connect connect.disconnect connect.subscribe connect.unsubscribe
+	"dojo/_base/connect", // connect.connect
 	"dojo/_base/declare", // declare
 	"dojo/dom", // dom.byId
 	"dojo/dom-attr", // domAttr.set domAttr.remove
@@ -13,14 +12,16 @@ define([
 	"dojo/dom-geometry",	// isBodyLtr
 	"dojo/dom-style", // domStyle.set, domStyle.get
 	"dojo/_base/lang", // mixin(), isArray(), etc.
+	"dojo/on",
 	"dojo/Stateful", // Stateful
-	"dojo/_base/window" // win.doc.createTextNode
-], function(require, dijit, array, aspect, config, connect, declare,
+	"dojo/topic",
+	"dojo/_base/window", // win.doc.createTextNode
+	"./registry"	// registry.getUniqueId(), registry.findWidgets()
+], function(require, array, aspect, config, connect, declare,
 			dom, domAttr, domClass, domConstruct, domGeometry, domStyle,
-			lang, Stateful, win){
+			lang, on, Stateful, topic, win, registry){
 
 /*=====
-var declare = dojo.declare;
 var Stateful = dojo.Stateful;
 =====*/
 
@@ -29,6 +30,13 @@ var Stateful = dojo.Stateful;
 // summary:
 //		Future base class for all Dijit widgets.
 
+// For back-compat, remove in 2.0.
+if(dojo && dojo.ready && !dojo.isAsync){
+	dojo.ready(0, function(){
+		var requires = ["dijit/_base/manager"];
+		require(requires);	// use indirection so modules not rolled into a build
+	});
+}
 
 // Nested hash listing attributes for each tag, all strings in lowercase.
 // ex: {"div": {"style": true, "tabindex" true}, "form": { ...
@@ -39,6 +47,17 @@ function getAttrs(obj){
 		ret[attr.toLowerCase()] = true;
 	}
 	return ret;
+}
+
+function nonEmptyAttrToDom(attr){
+	// summary:
+	//		Returns a setter function that copies the attribute to this.domNode,
+	//		or removes the attribute from this.domNode, depending on whether the
+	//		value is defined or not.
+	return function(val){
+		domAttr[val ? "set" : "remove"](this.domNode, attr, val);
+		this._set(attr, val);
+	};
 }
 
 return declare("dijit._WidgetBase", Stateful, {
@@ -99,14 +118,16 @@ return declare("dijit._WidgetBase", Stateful, {
 	//		Value must be among the list of locales specified during by the Dojo bootstrap,
 	//		formatted according to [RFC 3066](http://www.ietf.org/rfc/rfc3066.txt) (like en-us).
 	lang: "",
-	_setLangAttr: "domNode",	// to set on domNode even when there's a focus node
+	// set on domNode even when there's a focus node.   but don't set lang="", since that's invalid.
+	_setLangAttr: nonEmptyAttrToDom("lang"),
 
 	// dir: [const] String
 	//		Bi-directional support, as defined by the [HTML DIR](http://www.w3.org/TR/html401/struct/dirlang.html#adef-dir)
 	//		attribute. Either left-to-right "ltr" or right-to-left "rtl".  If undefined, widgets renders in page's
 	//		default direction.
 	dir: "",
-	_setDirAttr: "domNode",	// to set on domNode even when there's a focus node
+	// set on domNode even when there's a focus node.   but don't set dir="", since that's invalid.
+	_setDirAttr: nonEmptyAttrToDom("dir"),	// to set on domNode even when there's a focus node
 
 	// textDir: String
 	//		Bi-directional support,	the main variable which is responsible for the direction of the text.
@@ -155,7 +176,7 @@ return declare("dijit._WidgetBase", Stateful, {
 	// domNode: [readonly] DomNode
 	//		This is our visible representation of the widget! Other DOM
 	//		Nodes may by assigned to other properties, usually through the
-	//		template system's dojoAttachPoint syntax, but the domNode
+	//		template system's data-dojo-attach-point syntax, but the domNode
 	//		property is the canonical "top level" node in widget UI.
 	domNode: null,
 
@@ -164,20 +185,20 @@ return declare("dijit._WidgetBase", Stateful, {
 	//		"Children" in this case refers to both DOM nodes and widgets.
 	//		For example, for myWidget:
 	//
-	//		|	<div dojoType=myWidget>
+	//		|	<div data-dojo-type=myWidget>
 	//		|		<b> here's a plain DOM node
-	//		|		<span dojoType=subWidget>and a widget</span>
+	//		|		<span data-dojo-type=subWidget>and a widget</span>
 	//		|		<i> and another plain DOM node </i>
 	//		|	</div>
 	//
 	//		containerNode would point to:
 	//
 	//		|		<b> here's a plain DOM node
-	//		|		<span dojoType=subWidget>and a widget</span>
+	//		|		<span data-dojo-type=subWidget>and a widget</span>
 	//		|		<i> and another plain DOM node </i>
 	//
 	//		In templated widgets, "containerNode" is set via a
-	//		dojoAttachPoint assignment.
+	//		data-dojo-attach-point assignment.
 	//
 	//		containerNode must be defined for any widget that accepts innerHTML
 	//		(like ContentPane or BorderContainer or even Button), and conversely
@@ -293,9 +314,9 @@ return declare("dijit._WidgetBase", Stateful, {
 		// (be sure to do this before buildRendering() because that function might
 		// expect the id to be there.)
 		if(!this.id){
-			this.id = dijit.getUniqueId(this.declaredClass.replace(/\./g,"_"));
+			this.id = registry.getUniqueId(this.declaredClass.replace(/\./g,"_"));
 		}
-		dijit.registry.add(this);
+		registry.add(this);
 
 		this.buildRendering();
 
@@ -436,7 +457,9 @@ return declare("dijit._WidgetBase", Stateful, {
 		//		and all related widgets have finished their create() cycle, up through postCreate().
 		//		This is useful for composite widgets that need to control or layout sub-widgets.
 		//		Many layout widgets can use this as a wiring phase.
+		if(this._started){ return; }
 		this._started = true;
+		array.forEach(this.getChildren(), function(child){ child.startup(); });
 	},
 
 	//////////// DESTROY FUNCTIONS ////////////////////////////////
@@ -469,7 +492,7 @@ return declare("dijit._WidgetBase", Stateful, {
 		this._beingDestroyed = true;
 		this.uninitialize();
 
-		// remove connect.connect() and connect.subscribe() listeners
+		// remove this.connect() and this.subscribe() listeners
 		var c;
 		while(c = this._connects.pop()){
 			c.remove();
@@ -486,7 +509,7 @@ return declare("dijit._WidgetBase", Stateful, {
 		}
 
 		this.destroyRendering(preserveDom);
-		dijit.registry.remove(this.id);
+		registry.remove(this.id);
 		this._destroyed = true;
 	},
 
@@ -635,15 +658,13 @@ return declare("dijit._WidgetBase", Stateful, {
 		//		Get a named property from a widget. The property may
 		//		potentially be retrieved via a getter method. If no getter is defined, this
 		// 		just retrieves the object's property.
-		// 		For example, if the widget has a properties "foo"
-		//		and "bar" and a method named "_getFooAttr", calling:
-		//	|	myWidget.get("foo");
-		//		would be equivalent to writing:
-		//	|	widget._getFooAttr();
-		//		and:
-		//	|	myWidget.get("bar");
-		//		would be equivalent to writing:
-		//	|	widget.bar;
+		//
+		// 		For example, if the widget has properties `foo` and `bar`
+		//		and a method named `_getFooAttr()`, calling:
+		//		`myWidget.get("foo")` would be equivalent to calling
+		//		`widget._getFooAttr()` and `myWidget.get("bar")`
+		//		would be equivalent to the expression
+		//		`widget.bar2`
 		var names = this._getAttrNames(name);
 		return this[names.g] ? this[names.g]() : this[name];
 	},
@@ -658,22 +679,21 @@ return declare("dijit._WidgetBase", Stateful, {
 		// description:
 		//		Sets named properties on a widget which may potentially be handled by a
 		// 		setter in the widget.
-		// 		For example, if the widget has a properties "foo"
-		//		and "bar" and a method named "_setFooAttr", calling:
-		//	|	myWidget.set("foo", "Howdy!");
-		//		would be equivalent to writing:
-		//	|	widget._setFooAttr("Howdy!");
-		//		and:
-		//	|	myWidget.set("bar", 3);
-		//		would be equivalent to writing:
-		//	|	widget.bar = 3;
 		//
-		//	set() may also be called with a hash of name/value pairs, ex:
+		// 		For example, if the widget has properties `foo` and `bar`
+		//		and a method named `_setFooAttr()`, calling
+		//		`myWidget.set("foo", "Howdy!")` would be equivalent to calling
+		//		`widget._setFooAttr("Howdy!")` and `myWidget.set("bar", 3)`
+		//		would be equivalent to the statement `widget.bar = 3;`
+		//
+		//		set() may also be called with a hash of name/value pairs, ex:
+		//
 		//	|	myWidget.set({
 		//	|		foo: "Howdy",
 		//	|		bar: 3
-		//	|	})
-		//	This is equivalent to calling set(foo, "Howdy") and set(bar, 3)
+		//	|	});
+		//
+		//	This is equivalent to calling `set(foo, "Howdy")` and `set(bar, 3)`
 
 		if(typeof name === "object"){
 			for(var x in name){
@@ -742,15 +762,28 @@ return declare("dijit._WidgetBase", Stateful, {
 
 	on: function(/*String*/ type, /*Function*/ func){
 		// summary:
-		//		Call specified function when event "type" occurs, ex: myWidget.on("click", function(){ ... }).
+		//		Call specified function when event occurs, ex: myWidget.on("click", function(){ ... }).
 		// description:
-		//		Call specified function when event "type" occurs, ex: myWidget.on("click", function(){ ... }).
-		//		It's also implicitly called from connect.connect(myWidget, "onClick", ...).
+		//		Call specified function when event `type` occurs, ex: `myWidget.on("click", function(){ ... })`.
 		//		Note that the function is not run in any particular scope, so if (for example) you want it to run in the
-		//		widget's scope you must do myWidget.on("click", lang.hitch(myWidget, func)).
+		//		widget's scope you must do `myWidget.on("click", lang.hitch(myWidget, func))`.
 
-		type = type.replace(/^on/, "");
-		return aspect.after(this, "on" + type.charAt(0).toUpperCase() + type.substr(1), func, true);
+		return aspect.after(this, this._onMap(type), func, true);
+	},
+
+	_onMap: function(/*String*/ type){
+		// summary:
+		//		Maps on() type parameter (ex: "mousemove") to method name (ex: "onMouseMove")
+		var ctor = this.constructor, map = ctor._onMap;
+		if(!map){
+			map = (ctor._onMap = {});
+			for(var attr in ctor.prototype){
+				if(/^on/.test(attr)){
+					map[attr.replace(/^on/, "").toLowerCase()] = attr;
+				}
+			}
+		}
+		return map[type.toLowerCase()];	// String
 	},
 
 	toString: function(){
@@ -767,7 +800,13 @@ return declare("dijit._WidgetBase", Stateful, {
 		// summary:
 		//		Returns all the widgets contained by this, i.e., all widgets underneath this.containerNode.
 		//		Does not return nested widgets, nor widgets that are part of this widget's template.
-		return this.containerNode ? dijit.findWidgets(this.containerNode) : []; // dijit._Widget[]
+		return this.containerNode ? registry.findWidgets(this.containerNode) : []; // dijit._Widget[]
+	},
+
+	getParent: function(){
+		// summary:
+		//		Returns the parent widget of this widget
+		return registry.getEnclosingWidget(this.domNode.parentNode);
 	},
 
 	connect: function(
@@ -778,7 +817,7 @@ return declare("dijit._WidgetBase", Stateful, {
 		//		Connects specified obj/event to specified method of this object
 		//		and registers for disconnect() on widget destroy.
 		// description:
-		//		Provide widget-specific analog to connect.connect, except with the
+		//		Provide widget-specific analog to dojo.connect, except with the
 		//		implicit use of this widget as the target object.
 		//		Events connected with `this.connect` are disconnected upon
 		//		destruction.
@@ -806,25 +845,24 @@ return declare("dijit._WidgetBase", Stateful, {
 		//		Also removes handle from this widget's list of connects.
 		// tags:
 		//		protected
-
-		for(var i=0; i<this._connects.length; i++){
-			if(this._connects[i] == handle){
-				handle.remove();
-				this._connects.splice(i, 1);
-				return;
-			}
+		var i = array.indexOf(this._connects, handle);
+		if(i != -1){
+			handle.remove();
+			this._connects.splice(i, 1);
 		}
 	},
 
-	subscribe: function(
-			/*String*/ topic,
-			/*String|Function*/ method){
+	subscribe: function(t, method){
 		// summary:
 		//		Subscribes to the specified topic and calls the specified method
 		//		of this object and registers for unsubscribe() on widget destroy.
 		// description:
-		//		Provide widget-specific analog to connect.subscribe, except with the
+		//		Provide widget-specific analog to dojo.subscribe, except with the
 		//		implicit use of this widget as the target object.
+		// t: String
+		//		The topic
+		// method: Function
+		//		The callback
 		// example:
 		//	|	var btn = new dijit.form.Button();
 		//	|	// when /my/topic is published, this button changes its label to
@@ -834,7 +872,7 @@ return declare("dijit._WidgetBase", Stateful, {
 		//	|	});
 		// tags:
 		//		protected
-		var handle = connect.subscribe(topic, this, method);
+		var handle = topic.on(t, lang.hitch(this, method));
 		this._connects.push(handle);
 		return handle;		// _Widget.Handle
 	},
@@ -897,7 +935,7 @@ return declare("dijit._WidgetBase", Stateful, {
 		// | 	// create a Button with no srcNodeRef, and place it in the body:
 		// | 	var button = new dijit.form.Button({ label:"click" }).placeAt(win.body());
 		// | 	// now, 'button' is still the widget reference to the newly created button
-		// | 	connect.connect(button, "onClick", function(e){ console.log('click'); });
+		// | 	button.on("click", function(e){ console.log('click'); }));
 		//
 		// example:
 		// |	// create a button out of a node with id="src" and append it to id="wrapper":
@@ -931,12 +969,14 @@ return declare("dijit._WidgetBase", Stateful, {
 		return originalDir;
 	},
 
-	applyTextDir: function(/*Object*/ element, /*String*/ text){
+	applyTextDir: function(/*===== element, text =====*/){
 		// summary:
 		//		The function overridden in the _BidiSupport module,
 		//		originally used for setting element.dir according to this.textDir.
 		//		In this case does nothing.
-		//	tags:
+		// element: DOMNode
+		// text: String
+		// tags:
 		//		protected.
 	}
 });

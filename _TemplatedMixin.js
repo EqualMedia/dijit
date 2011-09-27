@@ -13,7 +13,6 @@ define([
 ], function(lang, touch, _WidgetBase, string, cache, array, declare, domConstruct, has, unload, win) {
 
 /*=====
-	var declare = dojo.declare;
 	var _WidgetBase = dijit._WidgetBase;
 =====*/
 
@@ -53,14 +52,14 @@ define([
 
 /*=====
 		// _attachPoints: [private] String[]
-		//		List of widget attribute names associated with dojoAttachPoint=... in the
+		//		List of widget attribute names associated with data-dojo-attach-point=... in the
 		//		template, ex: ["containerNode", "labelNode"]
  		_attachPoints: [],
  =====*/
 
 /*=====
 		// _attachEvents: [private] Handle[]
-		//		List of connections associated with dojoAttachEvent=... in the
+		//		List of connections associated with data-dojo-attach-event=... in the
 		//		template
  		_attachEvents: [],
  =====*/
@@ -154,7 +153,7 @@ define([
 		_attachTemplateNodes: function(rootNode, getAttrFunc){
 			// summary:
 			//		Iterate through the template and attach functions and nodes accordingly.
-			//		Alternately, if rootNode is an array of widgets, then will process dojoAttachPoint
+			//		Alternately, if rootNode is an array of widgets, then will process data-dojo-attach-point
 			//		etc. for those widgets.
 			// description:
 			//		Map widget properties and functions to the handlers specified in
@@ -177,7 +176,7 @@ define([
 				if(this.widgetsInTemplate && (getAttrFunc(baseNode, "dojoType") || getAttrFunc(baseNode, "data-dojo-type"))){
 					continue;
 				}
-				// Process dojoAttachPoint
+				// Process data-dojo-attach-point
 				var attachPoint = getAttrFunc(baseNode, "dojoAttachPoint") || getAttrFunc(baseNode, "data-dojo-attach-point");
 				if(attachPoint){
 					var point, points = attachPoint.split(/\s*,\s*/);
@@ -191,7 +190,7 @@ define([
 					}
 				}
 
-				// Process dojoAttachEvent
+				// Process data-dojo-attach-event
 				var attachEvent = getAttrFunc(baseNode, "dojoAttachEvent") || getAttrFunc(baseNode, "data-dojo-attach-event");
 				if(attachEvent){
 					// NOTE: we want to support attributes that have the form
@@ -296,8 +295,7 @@ define([
 	// These arguments can be specified for widgets which are used in templates.
 	// Since any widget can be specified as sub widgets in template, mix it
 	// into the base widget class.  (This is a hack, but it's effective.)
-	var extend = lang.extend;		/*===== extend = dojo.extend; =====*/
-	extend(_WidgetBase,{
+	lang.extend(_WidgetBase,{
 		dojoAttachEvent: "",
 		dojoAttachPoint: ""
 	});

@@ -1,11 +1,7 @@
 define([
-	".",	// dijit._getTabNavigable
-	"dojo/_base/declare" // declare
-], function(dijit, declare){
-
-/*=====
-	var declare = dojo.declare;
-=====*/
+	"dojo/_base/declare", // declare
+	"./a11y"	// _getTabNavigable
+], function(declare, a11y){
 
 	// module:
 	//		dijit/_DialogMixin
@@ -16,7 +12,7 @@ define([
 		// summary:
 		//		This provides functions useful to Dialog and TooltipDialog
 
-		execute: function(/*Object*/ formContents){
+		execute: function(/*Object*/ /*===== formContents =====*/){
 			// summary:
 			//		Callback when the user hits the submit button.
 			//		Override this method to handle Dialog execution.
@@ -68,7 +64,7 @@ define([
 			// tags:
 			//		protected
 
-			var elems = dijit._getTabNavigable(this.containerNode);
+			var elems = a11y._getTabNavigable(this.containerNode);
 			this._firstFocusItem = elems.lowest || elems.first || this.closeButtonNode || this.domNode;
 			this._lastFocusItem = elems.last || elems.highest || this._firstFocusItem;
 		}

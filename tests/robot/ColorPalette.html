@@ -15,7 +15,7 @@
 		<script type="text/javascript">
 			dojo.require("dijit.robotx");
 
-			dojo.addOnLoad(function(){
+			dojo.ready(function(){
 				doh.robot.initRobot('../test_ColorPalette.html');
 
 				var big, small, prog;
@@ -234,6 +234,11 @@
 							
 							return d;
 						}
+					},
+					function valuePreselected(){
+						var cp = dijit.byId("valuePreselected");
+						doh.is("#0000ff", cp.get("value"), "get('value')");
+						doh.is("blue", dojo.query(".dijitPaletteCellSelected img", cp.domNode)[0].alt, "marked");
 					}
 				]);
 

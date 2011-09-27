@@ -3,7 +3,6 @@ define([
 	"../_Widget",
 	"../_Container",
 	"../_Contained",
-	"dojo/_base/array", // array.filter array.forEach
 	"dojo/_base/declare", // declare
 	"dojo/dom-class", // domClass.add domClass.remove
 	"dojo/dom-geometry", // domGeometry.marginBox
@@ -11,10 +10,9 @@ define([
 	"dojo/_base/sniff", // has("ie")
 	"dojo/_base/window" // win.global
 ], function(lang, _Widget, _Container, _Contained,
-	array, declare, domClass, domGeometry, domStyle, has, win){
+	declare, domClass, domGeometry, domStyle, has, win){
 
 /*=====
-	var declare = dojo.declare;
 	var _Widget = dijit._Widget;
 	var _Container = dijit._Container;
 	var _Contained = dijit._Contained;
@@ -125,7 +123,7 @@ define([
 
 			// set margin box size, unless it wasn't specified, in which case use current size
 			if(changeSize){
-				domGeometry.setMarginBox(node, changeSize.l, changeSize.t, changeSize.w, changeSize.h);
+				domGeometry.setMarginBox(node, changeSize);
 			}
 
 			// If either height or width wasn't specified by the user, then query node for it.

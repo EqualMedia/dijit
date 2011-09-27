@@ -6,7 +6,6 @@ define([
 ], function(focus, _WidgetBase, declare, lang){
 
 /*=====
-	var declare = dojo.declare;
 	var _WidgetBase = dijit._WidgetBase;
 =====*/
 
@@ -18,8 +17,7 @@ define([
 
 	// We don't know where _FocusMixin will occur in the inheritance chain, but we need the _onFocus()/_onBlur() below
 	// to be last in the inheritance chain, so mixin to _WidgetBase.
-	var extend = lang.extend;		/*===== extend = dojo.extend; =====*/
-	extend(_WidgetBase, {
+	lang.extend(_WidgetBase, {
 		// focused: [readonly] Boolean
 		//		This widget or a widget it contains has focus, or is "active" because
 		//		it was recently clicked.
@@ -44,7 +42,7 @@ define([
 			//		callback
 		},
 
-		_onFocus: function(e){
+		_onFocus: function(){
 			// summary:
 			//		This is where widgets do processing for when they are active,
 			//		such as changing CSS classes.  See onFocus() for more details.

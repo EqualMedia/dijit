@@ -1,15 +1,12 @@
 define([
-	"..",
-	"dojo/_base/lang", // lang.isArray
-	"../focus",
-	"./manager",
 	"dojo/_base/array", // array.forEach
-	"dojo/_base/connect", // connect.publish
 	"dojo/dom", // dom.isDescendant
-	"dojo/_base/window" // win.doc win.doc.selection win.global win.global.getSelection win.withGlobal
-], function(dijit, lang, focus, manager, array, connect, dom, win){
-
-	var mixin = lang.mixin;		/*===== mixin = dojo.mixin; =====*/
+	"dojo/_base/lang", // lang.isArray
+	"dojo/topic", // publish
+	"dojo/_base/window", // win.doc win.doc.selection win.global win.global.getSelection win.withGlobal
+	"../focus",
+	".."	// for exporting symbols to dijit
+], function(array, dom, lang, topic, win, focus, dijit){
 
 	// module:
 	//		dijit/_base/focus
@@ -17,7 +14,7 @@ define([
 	//		Deprecated module to monitor currently focused node and stack of currently focused widgets.
 	//		New code should access dijit/focus directly.
 
-	mixin(dijit, {
+	lang.mixin(dijit, {
 		// _curFocus: DomNode
 		//		Currently focused item on screen
 		_curFocus: null,
@@ -218,7 +215,7 @@ define([
 			// handle:
 			//		Handle returned by registerIframe()
 
-			focus.unregisterIframe(handle);
+			handle && handle.remove();
 		},
 
 		registerWin: function(/*Window?*/targetWindow, /*DomNode?*/ effectiveNode){
@@ -246,8 +243,7 @@ define([
 			//		window or an iframe's window) according to handle returned from registerWin().
 			//		After calling be sure to delete or null out the handle itself.
 
-			// Currently our handle is actually a function
-			return focus.unregisterWin(handle);
+			handle && handle.remove();
 		}
 	});
 
@@ -305,7 +301,7 @@ define([
 		dijit._curFocus = newVal;
 		dijit._prevFocus = oldVal;
 		if(newVal){
-			connect.publish("focusNode", [newVal]);
+			topic.emit("focusNode", newVal);	// publish
 		}
 	});
 	focus.watch("activeStack", function(name, oldVal, newVal){
@@ -313,10 +309,10 @@ define([
 	});
 
 	focus.on("widget-blur", function(widget, by){
-		connect.publish("widgetBlur", [widget, by]);
+		topic.emit("widgetBlur", widget, by);	// publish
 	});
 	focus.on("widget-focus", function(widget, by){
-		connect.publish("widgetFocus", [widget, by]);
+		topic.emit("widgetFocus", widget, by);	// publish
 	});
 
 	return dijit;

@@ -1,22 +1,21 @@
 define([
-	"..",	// dijit.byId
+	"dojo/_base/array", // array.forEach array.indexOf array.map
+	"dojo/_base/declare", // declare
+	"dojo/_base/event", // event.stop
+	"dojo/keys", // keys
 	"dojo/_base/lang", // lang.getObject
+	"dojo/_base/sniff", // has("ie")
+	"../focus",		// focus.focus()
+	"../registry",	// registry.byId
 	"../_Widget",
 	"../_TemplatedMixin",
 	"../_Container",
 	"../form/ToggleButton",
-	"../focus",		// dijit.focus()
-	"dojo/i18n!../nls/common",
-	"dojo/_base/array", // array.forEach array.indexOf array.map
-	"dojo/keys", // keys
-	"dojo/_base/declare", // declare
-	"dojo/_base/event", // event.stop
-	"dojo/_base/sniff" // has("ie")
-], function(dijit, lang, _Widget, _TemplatedMixin, _Container, ToggleButton, focus, nlsCommon,
-	array, keys, declare, event, has){
+	"dojo/i18n!../nls/common"
+], function(array, declare, event, keys, lang, has,
+			focus, registry, _Widget, _TemplatedMixin, _Container, ToggleButton){
 
 /*=====
-	var declare = dojo.declare;
 	var _Widget = dijit._Widget;
 	var _TemplatedMixin = dijit._TemplatedMixin;
 	var _Container = dijit._Container;
@@ -28,6 +27,52 @@ define([
 	// summary:
 	//		Set of buttons to select a page in a `dijit.layout.StackContainer`
 
+	var StackButton = declare("dijit.layout._StackButton", ToggleButton, {
+		// summary:
+		//		Internal widget used by StackContainer.
+		// description:
+		//		The button-like or tab-like object you click to select or delete a page
+		// tags:
+		//		private
+
+		// Override _FormWidget.tabIndex.
+		// StackContainer buttons are not in the tab order by default.
+		// Probably we should be calling this.startupKeyNavChildren() instead.
+		tabIndex: "-1",
+
+		// closeButton: Boolean
+		//		When true, display close button for this tab
+		closeButton: false,
+		
+		_setCheckedAttr: function(/*Boolean*/ value, /*Boolean?*/ priorityChange){
+			this.inherited(arguments);
+			this.focusNode.removeAttribute("aria-pressed");
+		},
+
+		buildRendering: function(/*Event*/ evt){
+			this.inherited(arguments);
+			(this.focusNode || this.domNode).setAttribute("role", "tab");
+		},
+
+		onClick: function(/*Event*/ /*===== evt =====*/){
+			// summary:
+			//		This is for TabContainer where the tabs are <span> rather than button,
+			//		so need to set focus explicitly (on some browsers)
+			//		Note that you shouldn't override this method, but you can connect to it.
+			focus.focus(this.focusNode);
+
+			// ... now let StackController catch the event and tell me what to do
+		},
+
+		onClickCloseButton: function(/*Event*/ evt){
+			// summary:
+			//		StackContainer connects to this function; if your widget contains a close button
+			//		then clicking it should call this function.
+			//		Note that you shouldn't override this method, but you can connect to it.
+			evt.stopPropagation();
+		}
+	});
+
 
 	var StackController = declare("dijit.layout.StackController", [_Widget, _TemplatedMixin, _Container], {
 		// summary:
@@ -36,17 +81,17 @@ define([
 		//		Monitors the specified StackContainer, and whenever a page is
 		//		added, deleted, or selected, updates itself accordingly.
 
-		baseClass: "dijitTabController",
+		baseClass: "dijitStackController",
 
-		templateString: "<span role='tablist' dojoAttachEvent='onkeypress'></span>",
+		templateString: "<span role='tablist' data-dojo-attach-event='onkeypress'></span>",
 
 		// containerId: [const] String
 		//		The id of the page container that I point to
 		containerId: "",
 
-		// buttonWidget: [const] String
-		//		The name of the button widget to create to correspond to each page
-		buttonWidget: "dijit.layout._StackButton",
+		// buttonWidget: [const] Constructor
+		//		The button widget to create to correspond to each page
+		buttonWidget: StackButton,
 
 		constructor: function(){
 			this.pane2button = {};		// mapping from pane id to buttons
@@ -80,7 +125,7 @@ define([
 
 		destroy: function(){
 			for(var pane in this.pane2button){
-				this.onRemoveChild(dijit.byId(pane));
+				this.onRemoveChild(registry.byId(pane));
 			}
 			this.inherited(arguments);
 		},
@@ -93,7 +138,8 @@ define([
 			//		private
 
 			// create an instance of the button widget
-			var cls = lang.getObject(this.buttonWidget);
+			// (remove typeof buttonWidget == string support in 2.0)
+			var cls = lang.isString(this.buttonWidget) ? lang.getObject(this.buttonWidget) : this.buttonWidget;
 			var button = new cls({
 				id: this.id + "_" + page.id,
 				label: page.title,
@@ -183,7 +229,7 @@ define([
 			newButton.focusNode.setAttribute("aria-selected", "true");
 			this._currentChild = page;
 			newButton.focusNode.setAttribute("tabIndex", "0");
-			var container = dijit.byId(this.containerId);
+			var container = registry.byId(this.containerId);
 			container.containerNode.setAttribute("aria-labelledby", newButton.id);
 		},
 
@@ -193,7 +239,12 @@ define([
 			// tags:
 			//		private
 
-			var container = dijit.byId(this.containerId);
+			if(this._currentChild.id === page.id) {
+				//In case the user clicked the checked button, keep it in the checked state because it remains to be the selected stack page.
+				var button=this.pane2button[page.id];
+				button.set('checked', true);
+			}
+			var container = registry.byId(this.containerId);
 			container.selectChild(page);
 		},
 
@@ -203,12 +254,12 @@ define([
 			// tags:
 			//		private
 
-			var container = dijit.byId(this.containerId);
+			var container = registry.byId(this.containerId);
 			container.closeChild(page);
 			if(this._currentChild){
 				var b = this.pane2button[this._currentChild.id];
 				if(b){
-					dijit.focus(b.focusNode || b.domNode);
+					focus.focus(b.focusNode || b.domNode);
 				}
 			}
 		},
@@ -299,48 +350,7 @@ define([
 		}
 	});
 
-
-	StackController.StackButton = declare("dijit.layout._StackButton", ToggleButton, {
-		// summary:
-		//		Internal widget used by StackContainer.
-		// description:
-		//		The button-like or tab-like object you click to select or delete a page
-		// tags:
-		//		private
-
-		// Override _FormWidget.tabIndex.
-		// StackContainer buttons are not in the tab order by default.
-		// Probably we should be calling this.startupKeyNavChildren() instead.
-		tabIndex: "-1",
-
-		// closeButton: Boolean
-		//		When true, display close button for this tab
-		closeButton: false,
-
-		buildRendering: function(/*Event*/ evt){
-			this.inherited(arguments);
-			(this.focusNode || this.domNode).setAttribute("role", "tab");
-		},
-
-		onClick: function(/*Event*/ evt){
-			// summary:
-			//		This is for TabContainer where the tabs are <span> rather than button,
-			//		so need to set focus explicitly (on some browsers)
-			//		Note that you shouldn't override this method, but you can connect to it.
-			dijit.focus(this.focusNode);
-
-			// ... now let StackController catch the event and tell me what to do
-		},
-
-		onClickCloseButton: function(/*Event*/ evt){
-			// summary:
-			//		StackContainer connects to this function; if your widget contains a close button
-			//		then clicking it should call this function.
-			//		Note that you shouldn't override this method, but you can connect to it.
-			evt.stopPropagation();
-		}
-	});
-
+	StackController.StackButton = StackButton;	// for monkey patching
 
 	return StackController;
 });

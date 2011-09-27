@@ -1,21 +1,20 @@
 define([
-	"..",
-	"dojo/_base/lang", // lang.mixin
+	"dojo/_base/array", // array.filter array.forEach
+	"dojo/_base/declare", // declare
 	"dojo/dom-attr",	// domAttr.has
 	"dojo/dom-class",	// domClass.contains domClass.toggle
 	"dojo/dom-geometry",// domGeometry.contentBox domGeometry.marginBox
-	"../_Contained",
-	"./utils",	// marginBox2contextBox
-	"dojo/_base/array", // array.filter array.forEach
-	"dojo/_base/declare", // declare
+	"dojo/_base/lang", // lang.mixin
+	"dojo/query", // query
 	"dojo/_base/sniff", // has("ie")
 	"dojo/_base/window", // win.global
-	"dojo/query" // query
-], function(dijit, lang, domAttr, domClass, domGeometry, _Contained, layoutUtils,
-	array, declare, has, win, query){
+	"../registry",	// registry.byId
+	"./utils",	// marginBox2contextBox
+	"../_Contained"
+], function(array, declare, domAttr, domClass, domGeometry, lang, query, has, win,
+			registry, layoutUtils, _Contained){
 
 /*=====
-var declare = dojo.declare;
 var _Contained = dijit._Contained;
 =====*/
 
@@ -42,29 +41,10 @@ return declare("dijit.layout._ContentPaneResizeMixin", null, {
 	//				however big the ContentPane is
 	doLayout: true,
 
-	// isContainer: [protected] Boolean
-	//		Indicates that this widget acts as a "parent" to the descendant widgets.
-	//		When the parent is started it will call startup() on the child widgets.
-	//		See also `isLayoutContainer`.
-	isContainer: true,
-
 	// isLayoutContainer: [protected] Boolean
 	//		Indicates that this widget will call resize() on it's child widgets
 	//		when they become visible.
 	isLayoutContainer: true,
-
-	_startChildren: function(){
-		// summary:
-		//		Call startup() on all children including non _Widget ones like dojo.dnd.Source objects
-
-		// This starts all the widgets
-		array.forEach(this.getChildren(), function(child){
-			if(!child._started){
-				child.startup();
-				child._started = true;
-			}
-		});
-	},
 
 	startup: function(){
 		// summary:
@@ -74,7 +54,7 @@ return declare("dijit.layout._ContentPaneResizeMixin", null, {
 
 		if(this._started){ return; }
 
-		var parent = _Contained.prototype.getParent.call(this);
+		var parent = this.getParent();
 		this._childOfLayoutWidget = parent && parent.isLayoutContainer;
 
 		// I need to call resize() on my child/children (when I become visible), unless
@@ -82,8 +62,6 @@ return declare("dijit.layout._ContentPaneResizeMixin", null, {
 		this._needLayout = !this._childOfLayoutWidget;
 
 		this.inherited(arguments);
-
-		this._startChildren();
 
 		if(this._isShown()){
 			this._onShow();
@@ -116,7 +94,7 @@ return declare("dijit.layout._ContentPaneResizeMixin", null, {
 			childWidgetNodes = childNodes.filter(function(node){
 				return domAttr.has(node, "data-dojo-type") || domAttr.has(node, "dojoType") || domAttr.has(node, "widgetId");
 			}),
-			candidateWidgets = array.filter(childWidgetNodes.map(dijit.byNode), function(widget){
+			candidateWidgets = array.filter(childWidgetNodes.map(registry.byNode), function(widget){
 				return widget && widget.domNode && widget.resize;
 			});
 
@@ -179,7 +157,7 @@ return declare("dijit.layout._ContentPaneResizeMixin", null, {
 
 		// Set margin box size, unless it wasn't specified, in which case use current size.
 		if(changeSize){
-			domGeometry.setMarginBox(this.domNode, changeSize.l, changeSize.t, changeSize.w, changeSize.h);
+			domGeometry.setMarginBox(this.domNode, changeSize);
 		}
 
 		// Compute content box size of containerNode in case we [later] need to size our single child.

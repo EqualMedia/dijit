@@ -1,22 +1,21 @@
 define([
-	".",	// _connectToDomNode,
-	"./_WidgetBase",
-	"./_OnDijitClickMixin",
-	"./_FocusMixin",
+	"dojo/aspect",	// aspect.around
 	"dojo/_base/config",	// config.isDebug
 	"dojo/_base/connect",	// connect.connect
 	"dojo/_base/declare", // declare
 	"dojo/_base/kernel", // kernel.deprecated
 	"dojo/_base/lang", // lang.hitch
 	"dojo/query",
-	"dojo/uacss",		// brower sniffing (included for back-compat; subclasses may be using)
-	"dijit/hccss",		// high contrast mode sniffing (included to set CSS classes on <body>, module ret value unused)
-	"./_base/manager"	// dijit.byId, etc. (still using globals internally though)
-], function(dijit, _WidgetBase, _OnDijitClickMixin, _FocusMixin,
-			config, connect, declare, kernel, lang, query){
+	"./registry",	// registry.byNode
+	"./_WidgetBase",
+	"./_OnDijitClickMixin",
+	"./_FocusMixin",
+	"dojo/uacss",		// browser sniffing (included for back-compat; subclasses may be using)
+	"./hccss"		// high contrast mode sniffing (included to set CSS classes on <body>, module ret value unused)
+], function(aspect, config, connect, declare, kernel, lang, query,
+			registry, _WidgetBase, _OnDijitClickMixin, _FocusMixin){
 
 /*=====
-	var declare = dojo.declare;
 	var _WidgetBase = dijit._WidgetBase;
 	var _OnDijitClickMixin = dijit._OnDijitClickMixin;
 	var _FocusMixin = dijit._FocusMixin;
@@ -29,11 +28,25 @@ define([
 //		Old base for widgets.   New widgets should extend _WidgetBase instead
 
 
-dijit._connectToDomNode = function(/*Event*/ event){
+function connectToDomNode(){
 	// summary:
 	//		If user connects to a widget method === this function, then they will
 	//		instead actually be connecting the equivalent event on this.domNode
-};
+}
+
+// Trap dojo.connect() calls to connectToDomNode methods, and redirect to _Widget.on()
+function aroundAdvice(originalConnect){
+	return function(obj, event, scope, method){
+		if(obj && typeof event == "string" && obj[event] == connectToDomNode){
+			return obj.on(event.substring(2).toLowerCase(), lang.hitch(scope, method));
+		}
+		return originalConnect.apply(connect, arguments);
+	};
+}
+aspect.around(connect, "connect", aroundAdvice);
+if(kernel.connect){
+	aspect.around(kernel, "connect", aroundAdvice);
+}
 
 var _Widget = declare("dijit._Widget", [_WidgetBase, _OnDijitClickMixin, _FocusMixin], {
 	// summary:
@@ -43,7 +56,7 @@ var _Widget = declare("dijit._Widget", [_WidgetBase, _OnDijitClickMixin, _FocusM
 	//			- declaratively/programatically specifying widget initialization parameters like
 	//				onMouseMove="foo" that call foo when this.domNode gets a mousemove event
 	//			- ondijitclick
-	//				Support new dojoAttachEvent="ondijitclick: ..." that is triggered by a mouse click or a SPACE/ENTER keypress
+	//				Support new data-dojo-attach-event="ondijitclick: ..." that is triggered by a mouse click or a SPACE/ENTER keypress
 	//			- focus related functions
 	//				In particular, the onFocus()/onBlur() callbacks.   Driven internally by
 	//				dijit/_base/focus.js.
@@ -57,7 +70,7 @@ var _Widget = declare("dijit._Widget", [_WidgetBase, _OnDijitClickMixin, _FocusM
 
 	////////////////// DEFERRED CONNECTS ///////////////////
 
-	onClick: dijit._connectToDomNode,
+	onClick: connectToDomNode,
 	/*=====
 	onClick: function(event){
 		// summary:
@@ -68,7 +81,7 @@ var _Widget = declare("dijit._Widget", [_WidgetBase, _OnDijitClickMixin, _FocusM
 		//		callback
 	},
 	=====*/
-	onDblClick: dijit._connectToDomNode,
+	onDblClick: connectToDomNode,
 	/*=====
 	onDblClick: function(event){
 		// summary:
@@ -79,7 +92,7 @@ var _Widget = declare("dijit._Widget", [_WidgetBase, _OnDijitClickMixin, _FocusM
 		//		callback
 	},
 	=====*/
-	onKeyDown: dijit._connectToDomNode,
+	onKeyDown: connectToDomNode,
 	/*=====
 	onKeyDown: function(event){
 		// summary:
@@ -90,7 +103,7 @@ var _Widget = declare("dijit._Widget", [_WidgetBase, _OnDijitClickMixin, _FocusM
 		//		callback
 	},
 	=====*/
-	onKeyPress: dijit._connectToDomNode,
+	onKeyPress: connectToDomNode,
 	/*=====
 	onKeyPress: function(event){
 		// summary:
@@ -101,7 +114,7 @@ var _Widget = declare("dijit._Widget", [_WidgetBase, _OnDijitClickMixin, _FocusM
 		//		callback
 	},
 	=====*/
-	onKeyUp: dijit._connectToDomNode,
+	onKeyUp: connectToDomNode,
 	/*=====
 	onKeyUp: function(event){
 		// summary:
@@ -112,7 +125,7 @@ var _Widget = declare("dijit._Widget", [_WidgetBase, _OnDijitClickMixin, _FocusM
 		//		callback
 	},
 	=====*/
-	onMouseDown: dijit._connectToDomNode,
+	onMouseDown: connectToDomNode,
 	/*=====
 	onMouseDown: function(event){
 		// summary:
@@ -123,7 +136,7 @@ var _Widget = declare("dijit._Widget", [_WidgetBase, _OnDijitClickMixin, _FocusM
 		//		callback
 	},
 	=====*/
-	onMouseMove: dijit._connectToDomNode,
+	onMouseMove: connectToDomNode,
 	/*=====
 	onMouseMove: function(event){
 		// summary:
@@ -134,7 +147,7 @@ var _Widget = declare("dijit._Widget", [_WidgetBase, _OnDijitClickMixin, _FocusM
 		//		callback
 	},
 	=====*/
-	onMouseOut: dijit._connectToDomNode,
+	onMouseOut: connectToDomNode,
 	/*=====
 	onMouseOut: function(event){
 		// summary:
@@ -145,7 +158,7 @@ var _Widget = declare("dijit._Widget", [_WidgetBase, _OnDijitClickMixin, _FocusM
 		//		callback
 	},
 	=====*/
-	onMouseOver: dijit._connectToDomNode,
+	onMouseOver: connectToDomNode,
 	/*=====
 	onMouseOver: function(event){
 		// summary:
@@ -156,7 +169,7 @@ var _Widget = declare("dijit._Widget", [_WidgetBase, _OnDijitClickMixin, _FocusM
 		//		callback
 	},
 	=====*/
-	onMouseLeave: dijit._connectToDomNode,
+	onMouseLeave: connectToDomNode,
 	/*=====
 	onMouseLeave: function(event){
 		// summary:
@@ -167,7 +180,7 @@ var _Widget = declare("dijit._Widget", [_WidgetBase, _OnDijitClickMixin, _FocusM
 		//		callback
 	},
 	=====*/
-	onMouseEnter: dijit._connectToDomNode,
+	onMouseEnter: connectToDomNode,
 	/*=====
 	onMouseEnter: function(event){
 		// summary:
@@ -178,7 +191,7 @@ var _Widget = declare("dijit._Widget", [_WidgetBase, _OnDijitClickMixin, _FocusM
 		//		callback
 	},
 	=====*/
-	onMouseUp: dijit._connectToDomNode,
+	onMouseUp: connectToDomNode,
 	/*=====
 	onMouseUp: function(event){
 		// summary:
@@ -194,8 +207,8 @@ var _Widget = declare("dijit._Widget", [_WidgetBase, _OnDijitClickMixin, _FocusM
 		// extract parameters like onMouseMove that should connect directly to this.domNode
 		this._toConnect = {};
 		for(var name in params){
-			if(this[name] === dijit._connectToDomNode){
-				this._toConnect[name] = params[name];
+			if(this[name] === connectToDomNode){
+				this._toConnect[name.replace(/^on/, "").toLowerCase()] = params[name];
 				delete params[name];
 			}
 		}
@@ -212,14 +225,12 @@ var _Widget = declare("dijit._Widget", [_WidgetBase, _OnDijitClickMixin, _FocusM
 	},
 
 	on: function(/*String*/ type, /*Function*/ func){
-		type = type.replace(/^on/, "");
-		if(this["on" + type.charAt(0).toUpperCase() + type.substr(1)] === dijit._connectToDomNode){
+		if(this[this._onMap(type)] === connectToDomNode){
 			// Use connect.connect() rather than on() to get handling for "onmouseenter" on non-IE, etc.
 			// Also, need to specify context as "this" rather than the default context of the DOMNode
 			return connect.connect(this.domNode, type.toLowerCase(), this, func);
-		}else{
-			return this.inherited(arguments);
 		}
+		return this.inherited(arguments);
 	},
 
 	_setFocusedAttr: function(val){
@@ -279,7 +290,7 @@ var _Widget = declare("dijit._Widget", [_WidgetBase, _OnDijitClickMixin, _FocusM
 		//		supposed to be internal/hidden, but it's left here for back-compat reasons.
 
 		kernel.deprecated(this.declaredClass+"::getDescendants() is deprecated. Use getChildren() instead.", "", "2.0");
-		return this.containerNode ? query('[widgetId]', this.containerNode).map(dijit.byNode) : []; // dijit._Widget[]
+		return this.containerNode ? query('[widgetId]', this.containerNode).map(registry.byNode) : []; // dijit._Widget[]
 	},
 
 	////////////////// MISCELLANEOUS METHODS ///////////////////
@@ -332,7 +343,7 @@ var _Widget = declare("dijit._Widget", [_WidgetBase, _OnDijitClickMixin, _FocusM
 if(dojo.ready && !dojo.isAsync){
 	dojo.ready(0, function(){
 		var requires = ["dijit/_base/focus", "dijit/_base/place", "dijit/_base/popup", "dijit/_base/scroll",
-			"dijit/_base/typematic", "dijit/_base/wai", "dijit/_base/window"];
+			"dijit/_base/typematic", "dijit/_base/wai", "dijit/_base/window", "dijit/WidgetSet"];
 		require(requires);	// use indirection so modules not rolled into a build
 	})
 }

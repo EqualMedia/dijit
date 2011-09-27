@@ -1,11 +1,7 @@
 define([
-	".",	// getEnclosingWidget(), byNode()
-	"dojo/_base/declare" // declare
-], function(dijit, declare){
-
-/*=====
-	var declare = dojo.declare;
-=====*/
+	"dojo/_base/declare", // declare
+	"./registry"	// registry.getEnclosingWidget(), registry.byNode()
+], function(declare, registry){
 
 	// module:
 	//		dijit/_Contained
@@ -20,14 +16,6 @@ define([
 		// | 	// make a basic custom widget that knows about it's parents
 		// |	declare("my.customClass",[dijit._Widget,dijit._Contained],{});
 
-		getParent: function(){
-			// summary:
-			//		Returns the parent widget of this widget, assuming the parent
-			//		specifies isContainer
-			var parent = dijit.getEnclosingWidget(this.domNode.parentNode);
-			return parent && parent.isContainer ? parent : null;
-		},
-
 		_getSibling: function(/*String*/ which){
 			// summary:
 			//      Returns next or previous sibling
@@ -39,7 +27,7 @@ define([
 			do{
 				node = node[which+"Sibling"];
 			}while(node && node.nodeType != 1);
-			return node && dijit.byNode(node);	// dijit._Widget
+			return node && registry.byNode(node);	// dijit._Widget
 		},
 
 		getPreviousSibling: function(){

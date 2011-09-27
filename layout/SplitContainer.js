@@ -1,26 +1,25 @@
 define([
-	"dojo/_base/kernel", // kernel.deprecated
-	"..",	// dijit.getUniqueId()
-	"dojo/cookie", // cookie
-	"../_WidgetBase",
-	"./_LayoutWidget",
 	"dojo/_base/array", // array.forEach array.indexOf array.some
-	"dojo/_base/connect", // connect.connect connect.disconnect
+	"dojo/cookie", // cookie
 	"dojo/_base/declare", // declare
-	"dojo/_base/event", // event.stop
-	"dojo/_base/lang", // lang.extend
 	"dojo/dom", // dom.setSelectable
 	"dojo/dom-class", // domClass.add
 	"dojo/dom-construct", // domConstruct.create domConstruct.destroy
 	"dojo/dom-geometry", // domGeometry.marginBox domGeometry.position
 	"dojo/dom-style", // domStyle.style
+	"dojo/_base/event", // event.stop
+	"dojo/_base/kernel", // kernel.deprecated
+	"dojo/_base/lang", // lang.extend lang.hitch
+	"dojo/on",
 	"dojo/_base/sniff", // has("mozilla")
-	"dojo/_base/window" // win.doc.createElement win.doc.documentElement
-], function(kernel, dijit, cookie, _WidgetBase, _LayoutWidget, array, connect, declare, event, lang,
-			dom, domClass, domConstruct, domGeometry, domStyle, has, win){
+	"dojo/_base/window", // win.doc.createElement win.doc.documentElement
+	"../registry",	// registry.getUniqueId()
+	"../_WidgetBase",
+	"./_LayoutWidget"
+], function(array, cookie, declare, dom, domClass, domConstruct, domGeometry, domStyle,
+			event, kernel, lang, on, has, win, registry, _WidgetBase, _LayoutWidget){
 
 /*=====
-var declare = dojo.declare;
 var _WidgetBase = dijit._WidgetBase;
 var _LayoutWidget = dijit.layout._LayoutWidget;
 =====*/
@@ -39,8 +38,7 @@ var _LayoutWidget = dijit.layout._LayoutWidget;
 // These arguments can be specified for the children of a SplitContainer.
 // Since any widget can be specified as a SplitContainer child, mix them
 // into the base widget class.  (This is a hack, but it's effective.)
-var extend = lang.extend;		/*===== extend = dojo.extend; =====*/
-extend(_WidgetBase, {
+lang.extend(_WidgetBase, {
 	// sizeMin: [deprecated] Integer
 	//		Deprecated.  Parameter for children of `dijit.layout.SplitContainer`.
 	//		Minimum size (width or height) of a child of a SplitContainer.
@@ -134,7 +132,10 @@ return declare("dijit.layout.SplitContainer", _LayoutWidget, {
 
 	destroy: function(){
 		delete this.virtualSizer;
-		array.forEach(this._ownconnects, connect.disconnect);
+		if(this._ownconnects){
+			var h;
+			while(h = this._ownconnects.pop()){ h.remove(); }
+		}
 		this.inherited(arguments);
 	},
 	startup: function(){
@@ -179,7 +180,7 @@ return declare("dijit.layout.SplitContainer", _LayoutWidget, {
 
 		// TODO: use a template for this!!!
 		var sizer = win.doc.createElement('div');
-		sizer.id=dijit.getUniqueId('dijit_layout_SplitterContainer_Splitter');
+		sizer.id=registry.getUniqueId('dijit_layout_SplitterContainer_Splitter');
 		this.sizers.splice(index,0,sizer);
 		this.domNode.appendChild(sizer);
 
@@ -326,21 +327,24 @@ return declare("dijit.layout.SplitContainer", _LayoutWidget, {
 	},
 
 	_movePanel: function(panel, pos, size){
+		var box;
 		if(this.isHorizontal){
 			panel.domNode.style.left = pos + 'px';	// TODO: resize() takes l and t parameters too, don't need to set manually
 			panel.domNode.style.top = 0;
+			box = {w: size, h: this.paneHeight};
 			if(panel.resize){
-				panel.resize({w: size, h: this.paneHeight});
+				panel.resize(box);
 			}else{
-				domGeometry.setMarginBox(panel.domNode, NaN, NaN, size, this.paneHeight);
+				domGeometry.setMarginBox(panel.domNode, box);
 			}
 		}else{
 			panel.domNode.style.left = 0;	// TODO: resize() takes l and t parameters too, don't need to set manually
 			panel.domNode.style.top = pos + 'px';
+			box = {w: this.paneWidth, h: size};
 			if(panel.resize){
-				panel.resize({w: this.paneWidth, h: size});
+				panel.resize(box);
 			}else{
-				domGeometry.setMarginBox(panel.domNode, NaN, NaN, this.paneWidth, size);
+				domGeometry.setMarginBox(panel.domNode, box);
 			}
 		}
 	},
@@ -349,11 +353,11 @@ return declare("dijit.layout.SplitContainer", _LayoutWidget, {
 		if(this.isHorizontal){
 			slider.style.left = pos + 'px';
 			slider.style.top = 0;
-			domGeometry.setMarginBox(slider, NaN, NaN, size, this.paneHeight);
+			domGeometry.setMarginBox(slider, { w: size, h: this.paneHeight });
 		}else{
 			slider.style.left = 0;
 			slider.style.top = pos + 'px';
-			domGeometry.setMarginBox(slider, NaN, NaN, this.paneWidth, size);
+			domGeometry.setMarginBox(slider, { w: this.paneWidth, h: size });
 		}
 	},
 
@@ -438,13 +442,14 @@ return declare("dijit.layout.SplitContainer", _LayoutWidget, {
 
 		// TODO: REVISIT - we want MARGIN_BOX and core hasn't exposed that yet (but can't we use it anyway if we pay attention? we do elsewhere.)
 		this.originPos = domGeometry.position(children[0].domNode, true);
+		var client, screen;
 		if(this.isHorizontal){
-			var client = e.layerX || e.offsetX || 0;
-			var screen = e.pageX;
+			client = e.layerX || e.offsetX || 0;
+			screen = e.pageX;
 			this.originPos = this.originPos.x;
 		}else{
-			var client = e.layerY || e.offsetY || 0;
-			var screen = e.pageY;
+			client = e.layerY || e.offsetY || 0;
+			screen = e.pageY;
 			this.originPos = this.originPos.y;
 		}
 		this.startPoint = this.lastPoint = screen;
@@ -458,9 +463,10 @@ return declare("dijit.layout.SplitContainer", _LayoutWidget, {
 		//
 		// attach mouse events
 		//
-		this._ownconnects = [];
-		this._ownconnects.push(connect.connect(win.doc.documentElement, "onmousemove", this, "changeSizing"));
-		this._ownconnects.push(connect.connect(win.doc.documentElement, "onmouseup", this, "endSizing"));
+		this._ownconnects = [
+			on(win.doc.documentElement, "mousemove", lang.hitch(this, "changeSizing")),
+			on(win.doc.documentElement, "mouseup", lang.hitch(this, "endSizing"))
+		];
 
 		event.stop(e);
 	},
@@ -477,7 +483,7 @@ return declare("dijit.layout.SplitContainer", _LayoutWidget, {
 		event.stop(e);
 	},
 
-	endSizing: function(e){
+	endSizing: function(){
 		if(!this.isSizing){ return; }
 		if(this.cover){
 			this.cover.style.zIndex = -1;
@@ -494,7 +500,8 @@ return declare("dijit.layout.SplitContainer", _LayoutWidget, {
 			this._saveState(this);
 		}
 
-		array.forEach(this._ownconnects, connect.disconnect);
+		var h;
+		while(h = this._ownconnects.pop()){ h.remove(); }
 	},
 
 	movePoint: function(){
@@ -558,9 +565,8 @@ return declare("dijit.layout.SplitContainer", _LayoutWidget, {
 
 		this._moveSizingLine();
 
-		domGeometry.setMarginBox(this.virtualSizer, NaN, NaN,
-			this.isHorizontal ? this.sizerWidth : this.paneWidth,
-			this.isHorizontal ? this.paneHeight : this.sizerWidth );
+		domGeometry.setMarginBox(this.virtualSizer,
+			this.isHorizontal ? { w: this.sizerWidth, h: this.paneHeight } : { w: this.paneWidth, h: this.sizerWidth });
 
 		this.virtualSizer.style.display = 'block';
 	},

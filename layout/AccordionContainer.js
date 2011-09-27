@@ -1,18 +1,6 @@
 define([
-	"..",	// dijit.defaultDuration
-	"dojo/_base/lang", // lang.getObject lang.hitch
-	"dojo/text!./templates/AccordionButton.html",
 	"require",
-	"../_Widget",
-	"../_Container",
-	"../_TemplatedMixin",
-	"../_CssStateMixin",
-	"./StackContainer",
-	"./ContentPane",
-	"../focus",			// dijit.focus()
 	"dojo/_base/array", // array.forEach array.map
-	"dojo/_base/connect", // connect.publish
-	"dojo/keys", // keys
 	"dojo/_base/declare", // declare
 	"dojo/_base/event", // event.stop
 	"dojo/_base/fx", // fx.Animation
@@ -21,13 +9,24 @@ define([
 	"dojo/dom-class", // domClass.remove
 	"dojo/dom-construct", // domConstruct.place
 	"dojo/dom-geometry",
-	"dojo/_base/sniff" // has("ie")
-], function(dijit, lang, template, require,
-	_Widget, _Container, _TemplatedMixin, _CssStateMixin, StackContainer, ContentPane,
-	focus, array, connect, keys, declare, event, fx, dom, domAttr, domClass, domConstruct, domGeometry, has){
+	"dojo/keys", // keys
+	"dojo/_base/lang", // lang.getObject lang.hitch
+	"dojo/_base/sniff", // has("ie")
+	"dojo/topic", // publish
+	"../focus",			// focus.focus()
+	"../_base/manager",	// manager.defaultDuration
+	"../_Widget",
+	"../_Container",
+	"../_TemplatedMixin",
+	"../_CssStateMixin",
+	"./StackContainer",
+	"./ContentPane",
+	"dojo/text!./templates/AccordionButton.html"
+], function(require, array, declare, event, fx, dom, domAttr, domClass, domConstruct, domGeometry,
+			keys, lang, has, topic, focus, manager,
+			_Widget, _Container, _TemplatedMixin, _CssStateMixin, StackContainer, ContentPane, template){
 
 /*=====
-	var declare = dojo.declare;
 	var _Widget = dijit._Widget;
 	var _Container = dijit._Container;
 	var _TemplatedMixin = dijit._TemplatedMixin;
@@ -64,26 +63,205 @@ define([
 	// During animation there are two dijtAccordionChildWrapper's shown, so we need
 	// to compensate for that.
 
+
+	var AccordionButton = declare("dijit.layout._AccordionButton", [_Widget, _TemplatedMixin, _CssStateMixin], {
+		// summary:
+		//		The title bar to click to open up an accordion pane.
+		//		Internal widget used by AccordionContainer.
+		// tags:
+		//		private
+
+		templateString: template,
+
+		// label: String
+		//		Title of the pane
+		label: "",
+		_setLabelAttr: {node: "titleTextNode", type: "innerHTML" },
+
+		// title: String
+		//		Tooltip that appears on hover
+		title: "",
+		_setTitleAttr: {node: "titleTextNode", type: "attribute", attribute: "title"},
+
+		// iconClassAttr: String
+		//		CSS class for icon to left of label
+		iconClassAttr: "",
+		_setIconClassAttr: { node: "iconNode", type: "class" },
+
+		baseClass: "dijitAccordionTitle",
+
+		getParent: function(){
+			// summary:
+			//		Returns the AccordionContainer parent.
+			// tags:
+			//		private
+			return this.parent;
+		},
+
+		buildRendering: function(){
+			this.inherited(arguments);
+			var titleTextNodeId = this.id.replace(' ','_');
+			domAttr.set(this.titleTextNode, "id", titleTextNodeId+"_title");
+			this.focusNode.setAttribute("aria-labelledby", domAttr.get(this.titleTextNode, "id"));
+			dom.setSelectable(this.domNode, false);
+		},
+
+		getTitleHeight: function(){
+			// summary:
+			//		Returns the height of the title dom node.
+			return domGeometry.getMarginSize(this.domNode).h;	// Integer
+		},
+
+		// TODO: maybe the parent should set these methods directly rather than forcing the code
+		// into the button widget?
+		_onTitleClick: function(){
+			// summary:
+			//		Callback when someone clicks my title.
+			var parent = this.getParent();
+				parent.selectChild(this.contentWidget, true);
+				focus.focus(this.focusNode);
+		},
+
+		_onTitleKeyPress: function(/*Event*/ evt){
+			return this.getParent()._onKeyPress(evt, this.contentWidget);
+		},
+
+		_setSelectedAttr: function(/*Boolean*/ isSelected){
+			this._set("selected", isSelected);
+			this.focusNode.setAttribute("aria-expanded", isSelected);
+			this.focusNode.setAttribute("aria-selected", isSelected);
+			this.focusNode.setAttribute("tabIndex", isSelected ? "0" : "-1");
+		}
+	});
+
+	var AccordionInnerContainer = declare("dijit.layout._AccordionInnerContainer", [_Widget, _CssStateMixin], {
+		// summary:
+		//		Internal widget placed as direct child of AccordionContainer.containerNode.
+		//		When other widgets are added as children to an AccordionContainer they are wrapped in
+		//		this widget.
+
+/*=====
+		// buttonWidget: Function || String
+		//		Class to use to instantiate title
+		//		(Wish we didn't have a separate widget for just the title but maintaining it
+		//		for backwards compatibility, is it worth it?)
+		 buttonWidget: null,
+=====*/
+
+/*=====
+		// contentWidget: dijit._Widget
+		//		Pointer to the real child widget
+	 	contentWidget: null,
+=====*/
+
+		baseClass: "dijitAccordionInnerContainer",
+
+		// tell nested layout widget that we will take care of sizing
+		isLayoutContainer: true,
+
+		buildRendering: function(){
+			// Builds a template like:
+			//	<div class=dijitAccordionInnerContainer>
+			//		Button
+			//		<div class=dijitAccordionChildWrapper>
+			//			ContentPane
+			//		</div>
+			//	</div>
+
+			// Create wrapper div, placed where the child is now
+			this.domNode = domConstruct.place("<div class='" + this.baseClass +
+				"' role='presentation'>", this.contentWidget.domNode, "after");
+
+			// wrapper div's first child is the button widget (ie, the title bar)
+			var child = this.contentWidget,
+				cls = lang.isString(this.buttonWidget) ? lang.getObject(this.buttonWidget) : this.buttonWidget;
+			this.button = child._buttonWidget = (new cls({
+				contentWidget: child,
+				label: child.title,
+				title: child.tooltip,
+				dir: child.dir,
+				lang: child.lang,
+				textDir: child.textDir,
+				iconClass: child.iconClass,
+				id: child.id + "_button",
+				parent: this.parent
+			})).placeAt(this.domNode);
+
+			// and then the actual content widget (changing it from prior-sibling to last-child),
+			// wrapped by a <div class=dijitAccordionChildWrapper>
+			this.containerNode = domConstruct.place("<div class='dijitAccordionChildWrapper' style='display:none'>", this.domNode);
+			domConstruct.place(this.contentWidget.domNode, this.containerNode);
+		},
+
+		postCreate: function(){
+			this.inherited(arguments);
+
+			// Map changes in content widget's title etc. to changes in the button
+			var button = this.button;
+			this._contentWidgetWatches = [
+				this.contentWidget.watch('title', lang.hitch(this, function(name, oldValue, newValue){
+					button.set("label", newValue);
+				})),
+				this.contentWidget.watch('tooltip', lang.hitch(this, function(name, oldValue, newValue){
+					button.set("title", newValue);
+				})),
+				this.contentWidget.watch('iconClass', lang.hitch(this, function(name, oldValue, newValue){
+					button.set("iconClass", newValue);
+				}))
+			];
+		},
+
+		_setSelectedAttr: function(/*Boolean*/ isSelected){
+			this._set("selected", isSelected);
+			this.button.set("selected", isSelected);
+			if(isSelected){
+				var cw = this.contentWidget;
+				if(cw.onSelected){ cw.onSelected(); }
+			}
+		},
+
+		startup: function(){
+			// Called by _Container.addChild()
+			this.contentWidget.startup();
+		},
+
+		destroy: function(){
+			this.button.destroyRecursive();
+
+			array.forEach(this._contentWidgetWatches || [], function(w){ w.unwatch(); });
+
+			delete this.contentWidget._buttonWidget;
+			delete this.contentWidget._wrapperWidget;
+
+			this.inherited(arguments);
+		},
+
+		destroyDescendants: function(/*Boolean*/ preserveDom){
+			// since getChildren isn't working for me, have to code this manually
+			this.contentWidget.destroyRecursive(preserveDom);
+		}
+	});
+
 	var AccordionContainer = declare("dijit.layout.AccordionContainer", StackContainer, {
 		// summary:
 		//		Holds a set of panes where every pane's title is visible, but only one pane's content is visible at a time,
 		//		and switching between panes is visualized by sliding the other panes up/down.
 		// example:
-		//	| 	<div dojoType="dijit.layout.AccordionContainer">
-		//	|		<div dojoType="dijit.layout.ContentPane" title="pane 1">
+		//	| 	<div data-dojo-type="dijit.layout.AccordionContainer">
+		//	|		<div data-dojo-type="dijit.layout.ContentPane" title="pane 1">
 		//	|		</div>
-		//	|		<div dojoType="dijit.layout.ContentPane" title="pane 2">
+		//	|		<div data-dojo-type="dijit.layout.ContentPane" title="pane 2">
 		//	|			<p>This is some text</p>
 		//	|		</div>
 		//	|	</div>
 
 		// duration: Integer
 		//		Amount of time (in ms) it takes to slide panes
-		duration: dijit.defaultDuration,
+		duration: manager.defaultDuration,
 
 		// buttonWidget: [const] String
 		//		The name of the widget used to display the title of each pane
-		buttonWidget: "dijit.layout._AccordionButton",
+		buttonWidget: AccordionButton,
 
 /*=====
 		// _verticalSpace: Number
@@ -157,7 +335,7 @@ define([
 			// Overrides _LayoutWidget._setupChild().
 			// Put wrapper widget around the child widget, showing title
 
-			child._wrapperWidget = new dijit.layout._AccordionInnerContainer({
+			child._wrapperWidget = AccordionInnerContainer({
 				contentWidget: child,
 				buttonWidget: this.buttonWidget,
 				id: child.id + "_wrapper",
@@ -177,7 +355,15 @@ define([
 				// the new child inside another child's wrapper.
 
 				// First add in child as a direct child of this AccordionContainer
-				domConstruct.place(child.domNode, this.containerNode, insertIndex);
+				var refNode = this.containerNode;
+				if(insertIndex && typeof insertIndex == "number"){
+					var children = _Widget.prototype.getChildren.call(this);	// get wrapper panes
+					if(children && children.length >= insertIndex){
+						refNode = children[insertIndex-1].domNode;
+						insertIndex = "after";
+					}
+				}
+				domConstruct.place(child.domNode, refNode, insertIndex);
 
 				if(!child._started){
 					child.startup();
@@ -187,7 +373,7 @@ define([
 				this._setupChild(child);
 
 				// Code below copied from StackContainer
-				connect.publish(this.id+"-addChild", [child, insertIndex]);
+				topic.emit(this.id+"-addChild", child, insertIndex);	// publish
 				this.layout();
 				if(!this.selectedChildWidget){
 					this.selectChild(child);
@@ -349,184 +535,6 @@ define([
 		}
 	});
 
-	declare("dijit.layout._AccordionInnerContainer", [_Widget, _CssStateMixin], {
-		// summary:
-		//		Internal widget placed as direct child of AccordionContainer.containerNode.
-		//		When other widgets are added as children to an AccordionContainer they are wrapped in
-		//		this widget.
-
-/*=====
-		// buttonWidget: String
-		//		Name of class to use to instantiate title
-		//		(Wish we didn't have a separate widget for just the title but maintaining it
-		//		for backwards compatibility, is it worth it?)
-		 buttonWidget: null,
-=====*/
-
-/*=====
-		// contentWidget: dijit._Widget
-		//		Pointer to the real child widget
-	 	contentWidget: null,
-=====*/
-
-		baseClass: "dijitAccordionInnerContainer",
-
-		// tell nested layout widget that we will take care of sizing
-		isContainer: true,
-		isLayoutContainer: true,
-
-		buildRendering: function(){
-			// Builds a template like:
-			//	<div class=dijitAccordionInnerContainer>
-			//		Button
-			//		<div class=dijitAccordionChildWrapper>
-			//			ContentPane
-			//		</div>
-			//	</div>
-
-			// Create wrapper div, placed where the child is now
-			this.domNode = domConstruct.place("<div class='" + this.baseClass + "'>", this.contentWidget.domNode, "after");
-
-			// wrapper div's first child is the button widget (ie, the title bar)
-			var child = this.contentWidget,
-				cls = lang.getObject(this.buttonWidget);
-			this.button = child._buttonWidget = (new cls({
-				contentWidget: child,
-				label: child.title,
-				title: child.tooltip,
-				dir: child.dir,
-				lang: child.lang,
-				textDir: child.textDir,
-				iconClass: child.iconClass,
-				id: child.id + "_button",
-				parent: this.parent
-			})).placeAt(this.domNode);
-
-			// and then the actual content widget (changing it from prior-sibling to last-child),
-			// wrapped by a <div class=dijitAccordionChildWrapper>
-			this.containerNode = domConstruct.place("<div class='dijitAccordionChildWrapper' style='display:none'>", this.domNode);
-			domConstruct.place(this.contentWidget.domNode, this.containerNode);
-		},
-
-		postCreate: function(){
-			this.inherited(arguments);
-
-			// Map changes in content widget's title etc. to changes in the button
-			var button = this.button;
-			this._contentWidgetWatches = [
-				this.contentWidget.watch('title', lang.hitch(this, function(name, oldValue, newValue){
-					button.set("label", newValue);
-				})),
-				this.contentWidget.watch('tooltip', lang.hitch(this, function(name, oldValue, newValue){
-					button.set("title", newValue);
-				})),
-				this.contentWidget.watch('iconClass', lang.hitch(this, function(name, oldValue, newValue){
-					button.set("iconClass", newValue);
-				}))
-			];
-		},
-
-		_setSelectedAttr: function(/*Boolean*/ isSelected){
-			this._set("selected", isSelected);
-			this.button.set("selected", isSelected);
-			if(isSelected){
-				var cw = this.contentWidget;
-				if(cw.onSelected){ cw.onSelected(); }
-			}
-		},
-
-		startup: function(){
-			// Called by _Container.addChild()
-			this.contentWidget.startup();
-		},
-
-		destroy: function(){
-			this.button.destroyRecursive();
-
-			array.forEach(this._contentWidgetWatches || [], function(w){ w.unwatch(); });
-
-			delete this.contentWidget._buttonWidget;
-			delete this.contentWidget._wrapperWidget;
-
-			this.inherited(arguments);
-		},
-
-		destroyDescendants: function(){
-			// since getChildren isn't working for me, have to code this manually
-			this.contentWidget.destroyRecursive();
-		}
-	});
-
-	declare("dijit.layout._AccordionButton", [_Widget, _TemplatedMixin, _CssStateMixin], {
-		// summary:
-		//		The title bar to click to open up an accordion pane.
-		//		Internal widget used by AccordionContainer.
-		// tags:
-		//		private
-
-		templateString: template,
-
-		// label: String
-		//		Title of the pane
-		label: "",
-		_setLabelAttr: {node: "titleTextNode", type: "innerHTML" },
-
-		// title: String
-		//		Tooltip that appears on hover
-		title: "",
-		_setTitleAttr: {node: "titleTextNode", type: "attribute", attribute: "title"},
-
-		// iconClassAttr: String
-		//		CSS class for icon to left of label
-		iconClassAttr: "",
-		_setIconClassAttr: { node: "iconNode", type: "class" },
-
-		baseClass: "dijitAccordionTitle",
-
-		getParent: function(){
-			// summary:
-			//		Returns the AccordionContainer parent.
-			// tags:
-			//		private
-			return this.parent;
-		},
-
-		buildRendering: function(){
-			this.inherited(arguments);
-			var titleTextNodeId = this.id.replace(' ','_');
-			domAttr.set(this.titleTextNode, "id", titleTextNodeId+"_title");
-			this.focusNode.setAttribute("aria-labelledby", domAttr.get(this.titleTextNode, "id"));
-			dom.setSelectable(this.domNode, false);
-		},
-
-		getTitleHeight: function(){
-			// summary:
-			//		Returns the height of the title dom node.
-			return domGeometry.getMarginSize(this.domNode).h;	// Integer
-		},
-
-		// TODO: maybe the parent should set these methods directly rather than forcing the code
-		// into the button widget?
-		_onTitleClick: function(){
-			// summary:
-			//		Callback when someone clicks my title.
-			var parent = this.getParent();
-				parent.selectChild(this.contentWidget, true);
-				dijit.focus(this.focusNode);
-		},
-
-		_onTitleKeyPress: function(/*Event*/ evt){
-			return this.getParent()._onKeyPress(evt, this.contentWidget);
-		},
-
-		_setSelectedAttr: function(/*Boolean*/ isSelected){
-			this._set("selected", isSelected);
-			this.focusNode.setAttribute("aria-expanded", isSelected);
-			this.focusNode.setAttribute("aria-selected", isSelected);
-			this.focusNode.setAttribute("tabIndex", isSelected ? "0" : "-1");
-		}
-	});
-
 	// Back compat w/1.6, remove for 2.0
 	if(dojo && dojo.ready && !dojo.isAsync){
 		dojo.ready(0, function(){
@@ -534,6 +542,10 @@ define([
 			require(requires);	// use indirection so modules not rolled into a build
 		});
 	}
+
+	// For monkey patching
+	AccordionContainer._InnerContainer = AccordionInnerContainer;
+	AccordionContainer._Button = AccordionButton;
 
 	return AccordionContainer;
 });

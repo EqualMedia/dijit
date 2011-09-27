@@ -1,6 +1,14 @@
 define([
-	"dojo/_base/kernel", // kernel.isQuirks
-	"..",	// dijit.byId()
+	"dojo/_base/array", // array.forEach
+	"dojo/_base/declare", // declare
+	"dojo/dom-class", // domClass.add domClass.contains
+	"dojo/dom-geometry", // domGeometry.contentBox
+	"dojo/dom-style", // domStyle.style
+	"dojo/_base/fx", // Animation
+	"dojo/_base/lang", // lang.hitch
+	"dojo/query", // query
+	"dojo/_base/sniff", // has("ie"), has("webkit"), has("quirks")
+	"../registry",	// registry.byId()
 	"dojo/text!./templates/ScrollingTabController.html",
 	"dojo/text!./templates/_ScrollingTabControllerButton.html",
 	"./TabController",
@@ -10,20 +18,12 @@ define([
 	"../MenuItem",
 	"../form/Button",
 	"../_HasDropDown",
-	"dojo/_base/array", // array.forEach
-	"dojo/_base/declare", // declare
-	"dojo/dom-class", // domClass.add domClass.contains
-	"dojo/dom-geometry", // domGeometry.contentBox
-	"dojo/dom-style", // domStyle.style
-	"dojo/_base/lang", // lang.hitch
-	"dojo/_base/sniff", // has("ie") has("webKit")
-	"dojo/_base/fx", // Animation
-	"dojo/query" // query
-], function(kernel, dijit, tabControllerTemplate, buttonTemplate, TabController, layoutUtils, _WidgetsInTemplateMixin,
-	Menu, MenuItem, Button, _HasDropDown, array, declare, domClass, domGeometry, domStyle, lang, has, fx, query){
+	"dojo/NodeList-dom" // NodeList.style
+], function(array, declare, domClass, domGeometry, domStyle, fx, lang, query, has,
+	registry, tabControllerTemplate, buttonTemplate, TabController, layoutUtils, _WidgetsInTemplateMixin,
+	Menu, MenuItem, Button, _HasDropDown){
 
 /*=====
-var declare = dojo.declare;
 var _WidgetsInTemplateMixin = dijit._WidgetsInTemplateMixin;
 var Menu = dijit.Menu;
 var _HasDropDown = dijit._HasDropDown;
@@ -97,10 +97,10 @@ var ScrollingTabController = declare("dijit.layout.ScrollingTabController", [Tab
 	onStartup: function(){
 		this.inherited(arguments);
 
-		// Do not show the TabController until the related
-		// StackController has added it's children.  This gives
-		// a less visually jumpy instantiation.
-		domStyle.set(this.domNode, "visibility", "visible");
+		// TabController is hidden until it finishes drawing, to give
+		// a less visually jumpy instantiation.   When it's finished, set visibility to ""
+		// to that the tabs are hidden/shown depending on the container's visibility setting.
+		domStyle.set(this.domNode, "visibility", "");
 		this._postStartup = true;
 	},
 
@@ -111,7 +111,7 @@ var ScrollingTabController = declare("dijit.layout.ScrollingTabController", [Tab
 		// buttons, so do a resize
 		array.forEach(["label", "iconClass"], function(attr){
 			this.pane2watches[page.id].push(
-				this.pane2button[page.id].watch(attr, lang.hitch(this, function(name, oldValue, newValue){
+				this.pane2button[page.id].watch(attr, lang.hitch(this, function(){
 					if(this._postStartup && this._dim){
 						this.resize(this._dim);
 					}
@@ -193,7 +193,7 @@ var ScrollingTabController = declare("dijit.layout.ScrollingTabController", [Tab
 		this.scrollNode.style.height = "auto";
 		var cb = this._contentBox = layoutUtils.marginBox2contentBox(this.domNode, {h: 0, w: dim.w});
 		cb.h = this.scrollNode.offsetHeight;
-		domGeometry.setContentSize(this.domNode, cb.w, cb.h);
+		domGeometry.setContentSize(this.domNode, cb);
 
 		// Show/hide the left/right/menu navigation buttons depending on whether or not they
 		// are needed.
@@ -230,7 +230,7 @@ var ScrollingTabController = declare("dijit.layout.ScrollingTabController", [Tab
 		//		Returns the current scroll of the tabs where 0 means
 		//		"scrolled all the way to the left" and some positive number, based on #
 		//		of pixels of possible scroll (ex: 1000) means "scrolled all the way to the right"
-		return (this.isLeftToRight() || has("ie") < 8 || (has("ie") && kernel.isQuirks) || has("webKit")) ? this.scrollNode.scrollLeft :
+		return (this.isLeftToRight() || has("ie") < 8 || (has("ie") && has("quirks")) || has("webkit")) ? this.scrollNode.scrollLeft :
 				domStyle.get(this.containerNode, "width") - domStyle.get(this.scrollNode, "width")
 					 + (has("ie") == 8 ? -1 : 1) * this.scrollNode.scrollLeft;
 	},
@@ -243,7 +243,7 @@ var ScrollingTabController = declare("dijit.layout.ScrollingTabController", [Tab
 		//		to achieve that scroll.
 		//
 		//		This method is to adjust for RTL funniness in various browsers and versions.
-		if(this.isLeftToRight() || has("ie") < 8 || (has("ie") && kernel.isQuirks) || has("webKit")){
+		if(this.isLeftToRight() || has("ie") < 8 || (has("ie") && has("quirks")) || has("webkit")){
 			return val;
 		}else{
 			var maxScroll = domStyle.get(this.containerNode, "width") - domStyle.get(this.scrollNode, "width");
@@ -448,10 +448,15 @@ var ScrollingTabControllerButtonMixin = declare("dijit.layout._ScrollingTabContr
 	// either (this override avoids focus() call in FormWidget.js)
 	isFocusable: function(){ return false; }
 });
+/*=====
+ScrollingTabControllerButtonMixin = dijit.layout._ScrollingTabControllerButtonMixin;
+=====*/
 
+// Class used in template
 declare("dijit.layout._ScrollingTabControllerButton",
 	[Button, ScrollingTabControllerButtonMixin]);
 
+// Class used in template
 declare(
 	"dijit.layout._ScrollingTabControllerMenuButton",
 	[Button, _HasDropDown, ScrollingTabControllerButtonMixin],
@@ -475,7 +480,7 @@ declare(
 			lang: this.lang,
 			textDir: this.textDir
 		});
-		var container = dijit.byId(this.containerId);
+		var container = registry.byId(this.containerId);
 		array.forEach(container.getChildren(), function(page){
 			var menuItem = new MenuItem({
 				id: page.id + "_stcMi",

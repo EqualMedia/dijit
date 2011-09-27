@@ -16,7 +16,7 @@
 		<script type="text/javascript">
 			dojo.require("dijit.robotx");
 
-			dojo.addOnLoad(function(){
+			dojo.ready(function(){
 				doh.robot.initRobot('../test_Button.html');
 
 				doh.register("dijit.form.Button", [
@@ -330,8 +330,6 @@
 							var d = new doh.Deferred();
 
 							dijit.byId("save").set("disabled", true);
-
-							var d = new doh.Deferred();
 
 							// click left side of button
 							var leftPart = dojo.query(".dijitButtonContents", dojo.byId("save"))[0];

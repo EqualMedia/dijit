@@ -1,11 +1,4 @@
 define([
-	".",	// dijit.byNode()
-	"dojo/has",
-	"dojo/touch",
-	"./focus",
-	"./popup",
-	"./_FocusMixin",
-	"dojo/keys", // keys.DOWN_ARROW keys.ENTER keys.ESCAPE
 	"dojo/_base/declare", // declare
 	"dojo/_base/event", // event.stop
 	"dojo/dom", // dom.isDescendant
@@ -13,14 +6,20 @@ define([
 	"dojo/dom-class", // domClass.add domClass.contains domClass.remove
 	"dojo/dom-geometry", // domGeometry.marginBox domGeometry.position
 	"dojo/dom-style", // domStyle.set
+	"dojo/has",
+	"dojo/keys", // keys.DOWN_ARROW keys.ENTER keys.ESCAPE
 	"dojo/_base/lang", // lang.hitch lang.isFunction
+	"dojo/touch",
 	"dojo/_base/window", // win.doc
-	"dojo/window" // winUtils.getBox
-], function(dijit, has, touch, focus, popup, _FocusMixin, keys, declare, event,
-			dom, domAttr, domClass, domGeometry, domStyle, lang, win, winUtils){
+	"dojo/window", // winUtils.getBox
+	"./registry",	// registry.byNode()
+	"./focus",
+	"./popup",
+	"./_FocusMixin"
+], function(declare, event,dom, domAttr, domClass, domGeometry, domStyle, has, keys, lang, touch,
+			win, winUtils, registry, focus, popup, _FocusMixin){
 
 /*=====
-	var declare = dojo.declare;
 	var _FocusMixin = dijit._FocusMixin;
 =====*/
 
@@ -35,26 +34,26 @@ define([
 
 		// _buttonNode: [protected] DomNode
 		//		The button/icon/node to click to display the drop down.
-		//		Can be set via a dojoAttachPoint assignment.
+		//		Can be set via a data-dojo-attach-point assignment.
 		//		If missing, then either focusNode or domNode (if focusNode is also missing) will be used.
 		_buttonNode: null,
 
 		// _arrowWrapperNode: [protected] DomNode
 		//		Will set CSS class dijitUpArrow, dijitDownArrow, dijitRightArrow etc. on this node depending
 		//		on where the drop down is set to be positioned.
-		//		Can be set via a dojoAttachPoint assignment.
+		//		Can be set via a data-dojo-attach-point assignment.
 		//		If missing, then _buttonNode will be used.
 		_arrowWrapperNode: null,
 
 		// _popupStateNode: [protected] DomNode
 		//		The node to set the popupActive class on.
-		//		Can be set via a dojoAttachPoint assignment.
+		//		Can be set via a data-dojo-attach-point assignment.
 		//		If missing, then focusNode or _buttonNode (if focusNode is missing) will be used.
 		_popupStateNode: null,
 
 		// _aroundNode: [protected] DomNode
 		//		The node to display the popup around.
-		//		Can be set via a dojoAttachPoint assignment.
+		//		Can be set via a data-dojo-attach-point assignment.
 		//		If missing, then domNode will be used.
 		_aroundNode: null,
 
@@ -150,7 +149,7 @@ define([
 						t = e.target;
 						if(dropDown.onItemClick){
 							var menuItem;
-							while(t && !(menuItem = dijit.byNode(t))){
+							while(t && !(menuItem = registry.byNode(t))){
 								t = t.parentNode;
 							}
 							if(menuItem && menuItem.onClick && menuItem.getParent){
@@ -430,7 +429,7 @@ define([
 				if(lang.isFunction(dropDown.resize)){
 					dropDown.resize(mb);
 				}else{
-					domGeometry.setMarginBox(ddNode, mb.l, mb.t, mb.w, mb.h);
+					domGeometry.setMarginBox(ddNode, mb);
 				}
 			}
 

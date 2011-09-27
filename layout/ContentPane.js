@@ -18,7 +18,6 @@ define([
 	array, declare, Deferred, dom, domAttr, win, xhr, i18n){
 
 /*=====
-	var declare = dojo.declare;
 	var _Widget = dijit._Widget;
 	var _ContentPaneResizeMixin = dijit.layout._ContentPaneResizeMixin;
 =====*/
@@ -118,9 +117,15 @@ return declare("dijit.layout.ContentPane", [_Widget, _ContentPaneResizeMixin], {
 
 	baseClass: "dijitContentPane",
 
+	/*======
+	// ioMethod: dojo.xhrGet|dojo.xhrPost
+	//		Function that should grab the content specified via href.
+	ioMethod: dojo.xhrGet,
+	======*/
+
 	// ioArgs: Object
 	//		Parameters to pass to xhrGet() request, for example:
-	// |	<div dojoType="dijit.layout.ContentPane" href="./bar" ioArgs="{timeout: 500}">
+	// |	<div data-dojo-type="dijit.layout.ContentPane" data-dojo-props="href: './bar', ioArgs: {timeout: 500}">
 	ioArgs: {},
 
 	// onLoadDeferred: [readonly] dojo.Deferred
@@ -270,7 +275,7 @@ return declare("dijit.layout.ContentPane", [_Widget, _ContentPaneResizeMixin], {
 		this.onLoadDeferred = new Deferred(lang.hitch(this, "cancel"));
 		if(this._created){
 			// For back-compat reasons, call onLoad() for set('content', ...)
-			// calls but not for content specified in srcNodeRef (ie: <div dojoType=ContentPane>...</div>)
+			// calls but not for content specified in srcNodeRef (ie: <div data-dojo-type=ContentPane>...</div>)
 			// or as initialization parameter (ie: new ContentPane({content: ...})
 			this.onLoadDeferred.addCallback(lang.hitch(this, "onLoad"));
 		}
@@ -421,7 +426,7 @@ return declare("dijit.layout.ContentPane", [_Widget, _ContentPaneResizeMixin], {
 		}
 	},
 
-	destroyDescendants: function(){
+	destroyDescendants: function(/*Boolean*/ preserveDom){
 		// summary:
 		//		Destroy all the widgets inside the ContentPane and empty containerNode
 
@@ -438,7 +443,7 @@ return declare("dijit.layout.ContentPane", [_Widget, _ContentPaneResizeMixin], {
 		var setter = this._contentSetter;
 		array.forEach(this.getChildren(), function(widget){
 			if(widget.destroyRecursive){
-				widget.destroyRecursive();
+				widget.destroyRecursive(preserveDom);
 			}
 		});
 		if(setter){
@@ -446,14 +451,16 @@ return declare("dijit.layout.ContentPane", [_Widget, _ContentPaneResizeMixin], {
 			// things like Menu that have been moved to <body> haven't yet
 			array.forEach(setter.parseResults, function(widget){
 				if(widget.destroyRecursive && widget.domNode && widget.domNode.parentNode == win.body()){
-					widget.destroyRecursive();
+					widget.destroyRecursive(preserveDom);
 				}
 			});
 			delete setter.parseResults;
 		}
 
 		// And then clear away all the DOM nodes
-		html._emptyNode(this.containerNode);
+		if(!preserveDom){
+			html._emptyNode(this.containerNode);
+		}
 
 		// Delete any state information we have about current contents
 		delete this._singleChild;
@@ -539,7 +546,7 @@ return declare("dijit.layout.ContentPane", [_Widget, _ContentPaneResizeMixin], {
 	},
 
 	// EVENT's, should be overide-able
-	onLoad: function(data){
+	onLoad: function(/*===== data =====*/){
 		// summary:
 		//		Event hook, is called after everything is loaded and widgetified
 		// tags:
@@ -565,7 +572,7 @@ return declare("dijit.layout.ContentPane", [_Widget, _ContentPaneResizeMixin], {
 		return this.loadingMessage;
 	},
 
-	onContentError: function(/*Error*/ error){
+	onContentError: function(/*Error*/ /*===== error =====*/){
 		// summary:
 		//		Called on DOM faults, require faults etc. in content.
 		//
@@ -578,7 +585,7 @@ return declare("dijit.layout.ContentPane", [_Widget, _ContentPaneResizeMixin], {
 		//		extension
 	},
 
-	onDownloadError: function(/*Error*/ error){
+	onDownloadError: function(/*Error*/ /*===== error =====*/){
 		// summary:
 		//		Called when download error occurs.
 		//

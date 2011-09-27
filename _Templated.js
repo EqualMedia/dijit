@@ -9,7 +9,6 @@ define([
 ], function(_WidgetBase, _TemplatedMixin, _WidgetsInTemplateMixin, array, declare, lang, kernel){
 
 /*=====
-	var declare = dojo.declare;
 	var _WidgetBase = dijit._WidgetBase;
 	var _TemplatedMixin = dijit._TemplatedMixin;
 	var _WidgetsInTemplateMixin = dijit._WidgetsInTemplateMixin;
@@ -23,8 +22,7 @@ define([
 	// These arguments can be specified for widgets which are used in templates.
 	// Since any widget can be specified as sub widgets in template, mix it
 	// into the base widget class.  (This is a hack, but it's effective.)
-	var extend = lang.extend;		/*===== extend = dojo.extend; =====*/
-	extend(_WidgetBase, {
+	lang.extend(_WidgetBase, {
 		waiRole: "",
 		waiState:""
 	});

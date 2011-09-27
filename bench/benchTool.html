@@ -53,7 +53,7 @@
 		var theCount, theClass, runner = null;
 		var testCount = 0;
 
-		dojo.addOnLoad(function(){
+		dojo.ready(function(){
 			theCount = dojo.byId('countNode');
 			runner = dojo.byId('runner');
 			masterResults.dojoVersion = dojo.version.toString();
@@ -98,13 +98,14 @@
 				startTimer;
 			try{
 				dojo.require(/dojox\.mobile\.[A-Z]/.test(aclass) ? "dojox.mobile._base" : aclass);
-				dojo.addOnLoad(function(){
+				dojo.ready(function(){
+					var i;
 					switch(theMethod){
 						case "parse" :
 						case "fastparse" :
 							var tmpString = [];
 							var tag = /Button/.test(aclass) ? "button" : (/Text/.test(aclass) ? "input" : "div");
-							for(var i=0; i<count; i++){
+							for(i=0; i<count; i++){
 								tmpString.push(
 								'<', tag, ' ',
 								 (theMethod == 'fastparse' ? 'data-dojo-type="' : 'dojoType="'),
@@ -117,7 +118,7 @@
 						case "create" :
 							var construction = dojo.getObject(aclass);
 							startTimer = new Date().getTime();
-							for(var i=0; i<count; i++){
+							for(i=0; i<count; i++){
 								var tmp = new construction({});
 								tmpNode.appendChild(tmp.domNode);
 							}

@@ -1,11 +1,12 @@
 define([
-	"dojo/_base/kernel",
-	".",	// dijit (defining dijit.place to make doc parser happy)
-	"dojo/window", // dojo.window.getBox
-	"dojo/_base/array", // dojo.forEach dojo.map dojo.some
-	"dojo/_base/html", // dojo.marginBox dojo.position
-	"dojo/_base/window" // dojo.body
-], function(dojo, dijit){
+	"dojo/_base/array", // array.forEach array.map array.some
+	"dojo/dom-geometry", // domGeometry.getMarginBox domGeometry.position
+	"dojo/dom-style", // domStyle.getComputedStyle
+	"dojo/_base/kernel", // kernel.deprecated
+	"dojo/_base/window", // win.body
+	"dojo/window", // winUtils.getBox
+	"."	// dijit (defining dijit.place to match API doc)
+], function(array, domGeometry, domStyle, kernel, win, winUtils, dijit){
 
 	// module:
 	//		dijit/place
@@ -32,17 +33,17 @@ define([
 
 		// get {x: 10, y: 10, w: 100, h:100} type obj representing position of
 		// viewport over document
-		var view = dojo.window.getBox();
+		var view = winUtils.getBox();
 
 		// This won't work if the node is inside a <div style="position: relative">,
-		// so reattach it to dojo.doc.body.	 (Otherwise, the positioning will be wrong
+		// so reattach it to win.doc.body.	 (Otherwise, the positioning will be wrong
 		// and also it might get cutoff)
 		if(preserveDomPosition !== true && (!node.parentNode || String(node.parentNode.tagName).toLowerCase() != "body")){
-			dojo.body().appendChild(node);
+			win.body().appendChild(node);
 		}
 
 		var best = null;
-		dojo.some(choices, function(choice){
+		array.some(choices, function(choice){
 			var corner = choice.corner;
 			var pos = choice.pos;
 			var overflow = 0;
@@ -77,7 +78,7 @@ define([
 				style.visibility = "hidden";
 				style.display = "";
 			}
-			var mb = dojo.marginBox(node);
+			var mb = domGeometry. getMarginBox(node);
 			style.display = oldDisplay;
 			style.visibility = oldVis;
 
@@ -132,10 +133,11 @@ define([
 		//
 		// In RTL mode, set style.right rather than style.left so in the common case,
 		// window resizes move the popup along with the aroundNode.
-		var l = dojo._isBodyLtr(),
+		var l = domGeometry.isBodyLtr(),
 			s = node.style;
 		s.top = best.y + "px";
 		s[l ? "left" : "right"] = (l ? best.x : view.w - best.x - best.w) + "px";
+		s[l ? "right" : "left"] = "auto";	// needed for FF or else tooltip goes to far left
 
 		return best;
 	}
@@ -149,7 +151,7 @@ define([
 
 		this.x = x;
 		this.y = y;
-	}
+	};
 	=====*/
 
 	/*=====
@@ -167,10 +169,10 @@ define([
 		this.y = y;
 		this.w = w;
 		this.h = h;
-	}
+	};
 	=====*/
 
-	dijit.place = {
+	return (dijit.place = {
 		// summary:
 		//		Code to place a DOMNode relative to another DOMNode.
 		//		Load using require(["dijit/place"], function(place){ ... }).
@@ -201,7 +203,7 @@ define([
 			//		If that makes node go (partially) off screen, then try placing
 			//		bottom left corner at (10,20).
 			//	|	place(node, {x: 10, y: 20}, ["TR", "BL"])
-			var choices = dojo.map(corners, function(corner){
+			var choices = array.map(corners, function(corner){
 				var c = { corner: corner, pos: {x:pos.x,y:pos.y} };
 				if(padding){
 					c.pos.x += corner.charAt(1) == 'L' ? padding.x : -padding.x;
@@ -264,14 +266,32 @@ define([
 			//
 
 			// if around is a DOMNode (or DOMNode id), convert to coordinates
-			if(typeof anchor == "string" || "offsetWidth" in anchor){
-				anchor = dojo.position(anchor, true);
-			}
+			var aroundNodePos = (typeof anchor == "string" || "offsetWidth" in anchor)
+				? domGeometry.position(anchor, true)
+				: anchor;
 
-			var x = anchor.x,
-				y = anchor.y,
-				width = "w" in anchor ? anchor.w : (anchor.w = anchor.width),
-				height = "h" in anchor ? anchor.h : (dojo.deprecated("place.around: dijit.place.__Rectangle: { x:"+x+", y:"+y+", height:"+anchor.height+", width:"+width+" } has been deprecated.  Please use { x:"+x+", y:"+y+", h:"+anchor.height+", w:"+width+" }", "", "2.0"), anchor.h = anchor.height);
+			// Adjust anchor positioning for the case that a parent node has overflw hidden, therefore cuasing the anchor not to be completely visible
+			if(anchor.parentNode){
+				var parent = anchor.parentNode;
+				while(parent && parent.nodeType == 1 && parent.nodeName != "BODY"){  //ignoring the body will help performance
+					var parentPos = domGeometry.position(parent, true);
+					var parentStyleOverflow = domStyle.getComputedStyle(parent).overflow;
+					if(parentStyleOverflow == "hidden" || parentStyleOverflow == "auto" || parentStyleOverflow == "scroll"){
+						var bottomYCoord = Math.min(aroundNodePos.y + aroundNodePos.h, parentPos.y + parentPos.h);
+						var rightXCoord = Math.min(aroundNodePos.x + aroundNodePos.w, parentPos.x + parentPos.w);
+						aroundNodePos.x = Math.max(aroundNodePos.x, parentPos.x);
+						aroundNodePos.y = Math.max(aroundNodePos.y, parentPos.y);
+						aroundNodePos.h = bottomYCoord - aroundNodePos.y;
+						aroundNodePos.w = rightXCoord - aroundNodePos.x;
+					}	
+					parent = parent.parentNode;
+				}
+			}			
+
+			var x = aroundNodePos.x,
+				y = aroundNodePos.y,
+				width = "w" in aroundNodePos ? aroundNodePos.w : (aroundNodePos.w = aroundNodePos.width),
+				height = "h" in aroundNodePos ? aroundNodePos.h : (kernel.deprecated("place.around: dijit.place.__Rectangle: { x:"+x+", y:"+y+", height:"+aroundNodePos.height+", width:"+width+" } has been deprecated.  Please use { x:"+x+", y:"+y+", h:"+aroundNodePos.height+", w:"+width+" }", "", "2.0"), aroundNodePos.h = aroundNodePos.height);
 
 			// Convert positions arguments into choices argument for _place()
 			var choices = [];
@@ -293,7 +313,7 @@ define([
 					}
 				})
 			}
-			dojo.forEach(positions, function(pos){
+			array.forEach(positions, function(pos){
 				var ltr =  leftToRight;
 				switch(pos){
 					case "above-centered":
@@ -331,9 +351,10 @@ define([
 				}
 			});
 
-			return _place(node, choices, layoutNode, {w: width, h: height}, preserveDomPosition);
-		}
-	};
+			var position = _place(node, choices, layoutNode, {w: width, h: height}, preserveDomPosition);
+			position.aroundNodePos = aroundNodePos;
 
-	return dijit.place;
+			return position;
+		}
+	});
 });
