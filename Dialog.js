@@ -11,9 +11,11 @@ define([
 	"dojo/_base/event", // event.stop
 	"dojo/_base/fx", // fx.fadeIn fx.fadeOut
 	"dojo/i18n", // i18n.getLocalization
+	"dojo/_base/kernel", // kernel.isAsync
 	"dojo/keys",
 	"dojo/_base/lang", // lang.mixin lang.hitch
 	"dojo/on",
+	"dojo/ready",
 	"dojo/_base/sniff", // has("ie") has("opera")
 	"dojo/_base/window", // win.body
 	"dojo/window", // winUtils.getBox
@@ -32,7 +34,7 @@ define([
 	".",			// for back-compat, exporting dijit._underlay (remove in 2.0)
 	"dojo/i18n!./nls/common"
 ], function(require, array, connect, declare, Deferred,
-			dom, domClass, domGeometry, domStyle, event, fx, i18n, keys, lang, on, has, win, winUtils,
+			dom, domClass, domGeometry, domStyle, event, fx, i18n, kernel, keys, lang, on, ready, has, win, winUtils,
 			Moveable, TimedMoveable, focus, manager, _Widget, _TemplatedMixin, _CssStateMixin, _FormMixin, _DialogMixin,
 			DialogUnderlay, ContentPane, template, dijit){
 	
@@ -147,6 +149,10 @@ define([
 		//		</div>
 		"aria-describedby":"",
 
+		// maxRatio: Number
+		//		Maximum size to allow the dialog to expand to, relative to viewport size
+		maxRatio: 0.9,
+
 		postMixInProperties: function(){
 			var _nlsResources = i18n.getLocalization("dijit", "common");
 			lang.mixin(this, _nlsResources);
@@ -245,12 +251,19 @@ define([
 			}
 
 			var bb = domGeometry.position(this.domNode);
+
+			// Get viewport size but then reduce it by a bit; Dialog should always have some space around it
+			// to indicate that it's a popup.   This will also compensate for possible scrollbars on viewport.
 			var viewport = winUtils.getBox();
+			viewport.w *= this.maxRatio;
+			viewport.h *= this.maxRatio;
+
 			if(bb.w >= viewport.w || bb.h >= viewport.h){
 				// Reduce size of dialog contents so that dialog fits in viewport
 
-				var w = Math.min(bb.w, Math.floor(viewport.w * 0.75)),
-					h = Math.min(bb.h, Math.floor(viewport.h * 0.75));
+				var containerSize = domGeometry.position(this.containerNode),
+					w = Math.min(bb.w, viewport.w) - (bb.w - containerSize.w),
+					h = Math.min(bb.h, viewport.h) - (bb.h - containerSize.h);
 
 				if(this._singleChild && this._singleChild.resize){
 					this._singleChildOriginalStyle = this._singleChild.domNode.style.cssText;
@@ -476,6 +489,7 @@ define([
 					dijit._underlay.layout();
 				}
 				this._position();
+				this._size();
 			}
 		},
 
@@ -509,6 +523,8 @@ define([
 		//		stuff initially visible on the page (at z-index 0), and then having an entry for
 		//		each Dialog shown.
 
+		_beginZIndex: 950,
+
 		show: function(/*dijit._Widget*/ dialog, /*Object*/ underlayAttrs){
 			// summary:
 			//		Call right before fade-in animation for new dialog.
@@ -532,7 +548,7 @@ define([
 			}
 
 			// Set z-index a bit above previous dialog
-			var zIndex = ds[ds.length-1].dialog ? ds[ds.length-1].zIndex + 2 : 950;
+			var zIndex = ds[ds.length-1].dialog ? ds[ds.length-1].zIndex + 2 : Dialog._DialogLevelManager._beginZIndex;
 			if(ds.length == 1){	// first dialog
 				underlay.show();
 			}
@@ -621,8 +637,8 @@ define([
 	];
 
 	// Back compat w/1.6, remove for 2.0
-	if(dojo && !dojo.isAsync && dojo.ready){
-		dojo.ready(0, function(){
+	if(!kernel.isAsync){
+		ready(0, function(){
 			var requires = ["dijit/TooltipDialog"];
 			require(requires);	// use indirection so modules not rolled into a build
 		});

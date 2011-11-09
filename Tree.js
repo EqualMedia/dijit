@@ -468,7 +468,7 @@ var TreeNode = declare(
 		// description:
 		//		In particular, setting a node as selected involves setting tabIndex
 		//		so that when user tabs to the tree, focus will go to that node (only).
-		this.labelNode.setAttribute("aria-selected", selected);
+		this.labelNode.setAttribute("aria-selected", selected ? "true" : "false");
 		domClass.toggle(this.rowNode, "dijitTreeRowSelected", selected);
 	},
 
@@ -712,7 +712,7 @@ var Tree = declare("dijit.Tree", [_Widget, _TemplatedMixin], {
 	_publish: function(/*String*/ topicName, /*Object*/ message){
 		// summary:
 		//		Publish a message for this widget/topic
-		topic.emit(this.id, lang.mixin({tree: this, event: topicName}, message || {}));	// publish
+		topic.publish(this.id, lang.mixin({tree: this, event: topicName}, message || {}));	// publish
 	},
 
 	postMixInProperties: function(){

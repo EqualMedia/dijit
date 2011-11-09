@@ -11,15 +11,17 @@ define([
 	"dojo/dom-construct", // domConstruct.create domConstruct.destroy domConstruct.place
 	"dojo/dom-geometry",	// isBodyLtr
 	"dojo/dom-style", // domStyle.set, domStyle.get
+	"dojo/_base/kernel",
 	"dojo/_base/lang", // mixin(), isArray(), etc.
 	"dojo/on",
+	"dojo/ready",
 	"dojo/Stateful", // Stateful
 	"dojo/topic",
 	"dojo/_base/window", // win.doc.createTextNode
 	"./registry"	// registry.getUniqueId(), registry.findWidgets()
 ], function(require, array, aspect, config, connect, declare,
-			dom, domAttr, domClass, domConstruct, domGeometry, domStyle,
-			lang, on, Stateful, topic, win, registry){
+			dom, domAttr, domClass, domConstruct, domGeometry, domStyle, kernel,
+			lang, on, ready, Stateful, topic, win, registry){
 
 /*=====
 var Stateful = dojo.Stateful;
@@ -31,8 +33,8 @@ var Stateful = dojo.Stateful;
 //		Future base class for all Dijit widgets.
 
 // For back-compat, remove in 2.0.
-if(dojo && dojo.ready && !dojo.isAsync){
-	dojo.ready(0, function(){
+if(!kernel.isAsync){
+	ready(0, function(){
 		var requires = ["dijit/_base/manager"];
 		require(requires);	// use indirection so modules not rolled into a build
 	});
@@ -320,6 +322,8 @@ return declare("dijit._WidgetBase", Stateful, {
 
 		this.buildRendering();
 
+		var deleteSrcNodeRef;
+
 		if(this.domNode){
 			// Copy attributes listed in attributeMap into the [newly created] DOM for the widget.
 			// Also calls custom setters for all attributes with custom setters.
@@ -332,10 +336,9 @@ return declare("dijit._WidgetBase", Stateful, {
 			var source = this.srcNodeRef;
 			if(source && source.parentNode && this.domNode !== source){
 				source.parentNode.replaceChild(this.domNode, source);
+				deleteSrcNodeRef = true;
 			}
-		}
 
-		if(this.domNode){
 			// Note: for 2.0 may want to rename widgetId to dojo._scopeName + "_widgetId",
 			// assuming that dojo._scopeName even exists in 2.0
 			this.domNode.setAttribute("widgetId", this.id);
@@ -343,7 +346,8 @@ return declare("dijit._WidgetBase", Stateful, {
 		this.postCreate();
 
 		// If srcNodeRef has been processed and removed from the DOM (e.g. TemplatedWidget) then delete it to allow GC.
-		if(this.srcNodeRef && !this.srcNodeRef.parentNode){
+		// I think for back-compatibility it isn't deleting srcNodeRef until after postCreate() has run.
+		if(deleteSrcNodeRef){
 			delete this.srcNodeRef;
 		}
 
@@ -459,7 +463,12 @@ return declare("dijit._WidgetBase", Stateful, {
 		//		Many layout widgets can use this as a wiring phase.
 		if(this._started){ return; }
 		this._started = true;
-		array.forEach(this.getChildren(), function(child){ child.startup(); });
+		array.forEach(this.getChildren(), function(obj){
+			if(!obj._started && !obj._destroyed && lang.isFunction(obj.startup)){
+				obj.startup();
+				obj._started = true;
+			}
+		});
 	},
 
 	//////////// DESTROY FUNCTIONS ////////////////////////////////
@@ -872,7 +881,7 @@ return declare("dijit._WidgetBase", Stateful, {
 		//	|	});
 		// tags:
 		//		protected
-		var handle = topic.on(t, lang.hitch(this, method));
+		var handle = topic.subscribe(t, lang.hitch(this, method));
 		this._connects.push(handle);
 		return handle;		// _Widget.Handle
 	},

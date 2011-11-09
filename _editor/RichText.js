@@ -17,7 +17,7 @@ define([
 	"dojo/query", // query
 	"dojo/ready", // ready
 	"dojo/_base/sniff", // has("ie") has("mozilla") has("opera") has("safari") has("webkit")
-	"dojo/topic",	// topic.emit() (publish)
+	"dojo/topic",	// topic.publish() (publish)
 	"dojo/_base/unload", // unload
 	"dojo/_base/url", // url
 	"dojo/_base/window", // win.body win.doc.body.focus win.doc.createElement win.global.location win.withGlobal
@@ -197,7 +197,7 @@ var RichText = declare("dijit._editor.RichText", [_Widget, _CssStateMixin], {
 		}
 		this.inherited(arguments);
 
-		topic.emit(dijit._scopeName + "._editor.RichText::init", this);
+		topic.publish(dijit._scopeName + "._editor.RichText::init", this);
 		this.open();
 		this.setupDefaultShortcuts();
 	},
@@ -332,7 +332,7 @@ var RichText = declare("dijit._editor.RichText", [_Widget, _CssStateMixin], {
 		}
 
 		if(!this.isClosed){ this.close(); }
-		topic.emit(dijit._scopeName + "._editor.RichText::open", this);
+		topic.publish(dijit._scopeName + "._editor.RichText::open", this);
 
 		if(arguments.length === 1 && element.nodeName){ // else unchanged
 			this.domNode = element;
@@ -706,7 +706,7 @@ var RichText = declare("dijit._editor.RichText", [_Widget, _CssStateMixin], {
 			return;
 		}
 		delete this.editingAreaStyleSheets[index];
-		win.withGlobal(this.window,'query', dojo, ['link:[href="'+url+'"]']).orphan();
+		query('link:[href="'+url+'"]', this.window.document).orphan();
 	},
 
 	// disabled: Boolean
@@ -904,6 +904,14 @@ var RichText = declare("dijit._editor.RichText", [_Widget, _CssStateMixin], {
 			){ //arrow keys
 				e.charCode = e.keyCode;
 				this.onKeyPress(e);
+			}
+		}
+		if(has("ff")){
+			if(e.keyCode === keys.PAGE_UP || e.keyCode === keys.PAGE_DOWN ){
+				if(this.editNode.clientHeight >= this.editNode.scrollHeight){
+					// Stop the event to prevent firefox from trapping the cursor when there is no scroll bar.
+					e.preventDefault();
+				}
 			}
 		}
 		return true;
@@ -2570,7 +2578,7 @@ var RichText = declare("dijit._editor.RichText", [_Widget, _CssStateMixin], {
 							breaker.appendChild(sNode);
 							newContTag.appendChild(sNode);
 							win.withGlobal(this.window, lang.hitch(this, function(){
-								var newrange = rangeapi.create(dojo.gobal);// TODO: typo but still works??
+								var newrange = rangeapi.create();
 								newrange.setStart(sNode, 0);
 								newrange.setEnd(sNode, sNode.length);
 								selection.removeAllRanges();
@@ -2587,7 +2595,7 @@ var RichText = declare("dijit._editor.RichText", [_Widget, _CssStateMixin], {
 							breaker.appendChild(sNode);
 							domConstruct.place(breaker, newblock, "before");
 							win.withGlobal(this.window, lang.hitch(this, function(){
-								var newrange = rangeapi.create(dojo.gobal);// TODO: typo but still works??
+								var newrange = rangeapi.create();
 								newrange.setStart(sNode, 0);
 								newrange.setEnd(sNode, sNode.length);
 								selection.removeAllRanges();
@@ -2639,7 +2647,7 @@ var RichText = declare("dijit._editor.RichText", [_Widget, _CssStateMixin], {
 							domConstruct.place(endNode, breaker, "after");
 						}
 						domConstruct.destroy(rs);
-						var newrange = rangeapi.create(dojo.gobal);// TODO: typo but still works??
+						var newrange = rangeapi.create();
 						newrange.setStart(sNode, 0);
 						newrange.setEnd(sNode, sNode.length);
 						selection.removeAllRanges();
@@ -2704,7 +2712,7 @@ var RichText = declare("dijit._editor.RichText", [_Widget, _CssStateMixin], {
 							// sometimes throws errors.
 							domConstruct.create("br", null, list, "after");
 							// Okay, now lets move our cursor to the beginning.
-							var newrange = rangeapi.create(dojo.gobal);// TODO: typo but still works??
+							var newrange = rangeapi.create();
 							newrange.setStart(sc, 0);
 							newrange.setEnd(sc, sc.length);
 							selection.removeAllRanges();
@@ -2774,7 +2782,7 @@ var RichText = declare("dijit._editor.RichText", [_Widget, _CssStateMixin], {
 							domConstruct.place(endNode, breaker, "after");
 						}
 						domConstruct.destroy(rs);
-						var newrange = rangeapi.create(dojo.gobal);// TODO: typo but still works??
+						var newrange = rangeapi.create();
 						newrange.setStart(sNode, 0);
 						newrange.setEnd(sNode, sNode.length);
 						selection.removeAllRanges();

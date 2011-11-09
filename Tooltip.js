@@ -17,7 +17,7 @@ define([
 	"dojo/text!./templates/Tooltip.html",
 	"."		// sets dijit.showTooltip etc. for back-compat
 ], function(array, declare, fx, dom, domClass, domGeometry, domStyle, lang, has, win,
-			manager, place, _Widget, _TemplatedMixin, BackgroundIframe, template){
+			manager, place, _Widget, _TemplatedMixin, BackgroundIframe, template, dijit){
 
 /*=====
 	var _Widget = dijit._Widget;
@@ -56,10 +56,22 @@ define([
 			this.fadeOut = fx.fadeOut({ node: this.domNode, duration: this.duration, onEnd: lang.hitch(this, "_onHide") });
 		},
 
-		show: function(/*String*/ innerHTML, /*DomNode || dijit.__Rectangle*/ aroundNode, /*String[]?*/ position, /*Boolean*/ rtl){
+		show: function(innerHTML, aroundNode, position, rtl, textDir){
 			// summary:
 			//		Display tooltip w/specified contents to right of specified node
 			//		(To left if there's no space on the right, or if rtl == true)
+			// innerHTML: String
+			//		Contents of the tooltip
+			// aroundNode: DomNode || dijit.__Rectangle
+			//		Specifies that tooltip should be next to this node / area
+			// position: String[]?
+			//		List of positions to try to position tooltip (ex: ["right", "above"])
+			// rtl: Boolean?
+			//		Corresponds to `WidgetBase.dir` attribute, where false means "ltr" and true
+			//		means "rtl"; specifies GUI direction, not text direction.
+			// textDir: String?
+			//		Corresponds to `WidgetBase.textdir` attribute; specifies direction of text.
+
 
 			if(this.aroundNode && this.aroundNode === aroundNode && this.containerNode.innerHTML == innerHTML){
 				return;
@@ -74,6 +86,9 @@ define([
 				return;
 			}
 			this.containerNode.innerHTML=innerHTML;
+			
+			this.set("textDir", textDir);
+			this.containerNode.align = rtl? "right" : "left"; //fix the text alignment
 
 			var pos = place.around(this.domNode, aroundNode,
 				position && position.length ? position : Tooltip.defaultPosition, !rtl, lang.hitch(this, "orient"));
@@ -102,10 +117,20 @@ define([
 			//		width to whatever width is available
 			// tags:
 			//		protected
+
 			this.connectorNode.style.top = ""; //reset to default
 
-			//Adjust the spaceAvailable width, without changing the spaceAvailable object
-			var tooltipSpaceAvaliableWidth = spaceAvailable.w - this.connectorNode.offsetWidth;
+			// Adjust for space taking by tooltip connector.
+			// Take care not to modify the original spaceAvailable arg as that confuses the caller (dijit.place).
+			var heightAvailable = spaceAvailable.h,
+				widthAvailable = spaceAvailable.w;
+			if(aroundCorner.charAt(1) != tooltipCorner.charAt(1)){
+				// left/right tooltip
+				widthAvailable -= this.connectorNode.offsetWidth;
+			}else{
+				// above/below tooltip
+				heightAvailable -= this.connectorNode.offsetHeight;
+			}
 
 			node.className = "dijitTooltip " +
 				{
@@ -125,29 +150,18 @@ define([
 			this.domNode.style.width = "auto";
 			var size = domGeometry.getContentBox(this.domNode);
 
-			var width = Math.min((Math.max(tooltipSpaceAvaliableWidth,1)), size.w);
+			var width = Math.min((Math.max(widthAvailable,1)), size.w);
 			var widthWasReduced = width < size.w;
 
 			this.domNode.style.width = width+"px";
-
-			//Adjust width for tooltips that have a really long word or a nowrap setting
-			if(widthWasReduced){
-				this.containerNode.style.overflow = "auto"; //temp change to overflow to detect if our tooltip needs to be wider to support the content
-				var scrollWidth = this.containerNode.scrollWidth;
-				this.containerNode.style.overflow = "visible"; //change it back
-				if(scrollWidth > width){
-					scrollWidth = scrollWidth + domStyle.get(this.domNode,"paddingLeft") + domStyle.get(this.domNode,"paddingRight");
-					this.domNode.style.width = scrollWidth + "px";
-				}
-			}
 
 			// Reposition the tooltip connector.
 			if(tooltipCorner.charAt(0) == 'B' && aroundCorner.charAt(0) == 'B'){
 				var mb = domGeometry.getMarginBox(node);
 				var tooltipConnectorHeight = this.connectorNode.offsetHeight;
-				if(mb.h > spaceAvailable.h){
+				if(mb.h > heightAvailable){
 					// The tooltip starts at the top of the page and will extend past the aroundNode
-					var aroundNodePlacement = spaceAvailable.h - ((aroundNodeCoords.h + tooltipConnectorHeight) >> 1);
+					var aroundNodePlacement = heightAvailable - ((aroundNodeCoords.h + tooltipConnectorHeight) >> 1);
 					this.connectorNode.style.top = aroundNodePlacement + "px";
 					this.connectorNode.style.bottom = "";
 				}else{
@@ -165,7 +179,7 @@ define([
 				this.connectorNode.style.bottom = "";
 			}
 
-			return Math.max(0, size.w - tooltipSpaceAvaliableWidth);
+			return Math.max(0, size.w - widthAvailable);
 		},
 
 		_onShow: function(){
@@ -211,24 +225,60 @@ define([
 				this.show.apply(this, this._onDeck);
 				this._onDeck=null;
 			}
-		}
+		},
+		
+		_setAutoTextDir: function(/*Object*/node){
+		    // summary:
+		    //	    Resolve "auto" text direction for children nodes
+		    // tags:
+		    //		private
 
+            this.applyTextDir(node, has("ie") ? node.outerText : node.textContent);
+            array.forEach(node.children, function(child){this._setAutoTextDir(child); }, this);
+		},
+		
+		_setTextDirAttr: function(/*String*/ textDir){
+		    // summary:
+		    //		Setter for textDir.
+		    // description:
+		    //		Users shouldn't call this function; they should be calling
+		    //		set('textDir', value)
+		    // tags:
+		    //		private
+	
+            this._set("textDir", typeof textDir != 'undefined'? textDir : "");
+    	    if (textDir == "auto"){
+    	        this._setAutoTextDir(this.containerNode);
+    	    }else{
+    	        this.containerNode.dir = this.textDir;
+    	    }  		             		        
+        }
 	});
 
-	dijit.showTooltip = function(/*String*/ innerHTML, /*DomNode || dijit.__Rectangle*/ aroundNode, /*String[]?*/ position, /*Boolean*/ rtl){
+	dijit.showTooltip = function(innerHTML, aroundNode, position, rtl, textDir){
 		// summary:
 		//		Static method to display tooltip w/specified contents in specified position.
 		//		See description of dijit.Tooltip.defaultPosition for details on position parameter.
 		//		If position is not specified then dijit.Tooltip.defaultPosition is used.
+		// innerHTML: String
+		//		Contents of the tooltip
+		// aroundNode: dijit.__Rectangle
+		//		Specifies that tooltip should be next to this node / area
+		// position: String[]?
+		//		List of positions to try to position tooltip (ex: ["right", "above"])
+		// rtl: Boolean?
+		//		Corresponds to `WidgetBase.dir` attribute, where false means "ltr" and true
+		//		means "rtl"; specifies GUI direction, not text direction.
+		// textDir: String?
+		//		Corresponds to `WidgetBase.textdir` attribute; specifies direction of text.
 		if(!Tooltip._masterTT){ dijit._masterTT = Tooltip._masterTT = new MasterTooltip(); }
-		return Tooltip._masterTT.show(innerHTML, aroundNode, position, rtl);
+		return Tooltip._masterTT.show(innerHTML, aroundNode, position, rtl, textDir);
 	};
 
 	dijit.hideTooltip = function(aroundNode){
 		// summary:
 		//		Static method to hide the tooltip displayed via showTooltip()
-		if(!Tooltip._masterTT){ dijit._masterTT = Tooltip._masterTT = new MasterTooltip(); }
-		return Tooltip._masterTT.hide(aroundNode);
+		return Tooltip._masterTT && Tooltip._masterTT.hide(aroundNode);
 	};
 
 	var Tooltip = declare("dijit.Tooltip", _Widget, {
@@ -362,7 +412,7 @@ define([
 				clearTimeout(this._showTimer);
 				delete this._showTimer;
 			}
-			Tooltip.show(this.label || this.domNode.innerHTML, target, this.position, !this.isLeftToRight());
+			Tooltip.show(this.label || this.domNode.innerHTML, target, this.position, !this.isLeftToRight(), this.textDir);
 
 			this._connectNode = target;
 			this.onShow(target, this.position);

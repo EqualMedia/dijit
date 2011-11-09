@@ -9,12 +9,14 @@ define([
 	"dojo/dom-class", // domClass.remove
 	"dojo/dom-construct", // domConstruct.place
 	"dojo/dom-geometry",
+	"dojo/_base/kernel",
 	"dojo/keys", // keys
 	"dojo/_base/lang", // lang.getObject lang.hitch
 	"dojo/_base/sniff", // has("ie")
 	"dojo/topic", // publish
 	"../focus",			// focus.focus()
 	"../_base/manager",	// manager.defaultDuration
+	"dojo/ready",
 	"../_Widget",
 	"../_Container",
 	"../_TemplatedMixin",
@@ -23,7 +25,7 @@ define([
 	"./ContentPane",
 	"dojo/text!./templates/AccordionButton.html"
 ], function(require, array, declare, event, fx, dom, domAttr, domClass, domConstruct, domGeometry,
-			keys, lang, has, topic, focus, manager,
+			kernel, keys, lang, has, topic, focus, manager, ready,
 			_Widget, _Container, _TemplatedMixin, _CssStateMixin, StackContainer, ContentPane, template){
 
 /*=====
@@ -128,8 +130,8 @@ define([
 
 		_setSelectedAttr: function(/*Boolean*/ isSelected){
 			this._set("selected", isSelected);
-			this.focusNode.setAttribute("aria-expanded", isSelected);
-			this.focusNode.setAttribute("aria-selected", isSelected);
+			this.focusNode.setAttribute("aria-expanded", isSelected ? "true" : "false");
+			this.focusNode.setAttribute("aria-selected", isSelected ? "true" : "false");
 			this.focusNode.setAttribute("tabIndex", isSelected ? "0" : "-1");
 		}
 	});
@@ -373,7 +375,7 @@ define([
 				this._setupChild(child);
 
 				// Code below copied from StackContainer
-				topic.emit(this.id+"-addChild", child, insertIndex);	// publish
+				topic.publish(this.id+"-addChild", child, insertIndex);	// publish
 				this.layout();
 				if(!this.selectedChildWidget){
 					this.selectChild(child);
@@ -536,8 +538,8 @@ define([
 	});
 
 	// Back compat w/1.6, remove for 2.0
-	if(dojo && dojo.ready && !dojo.isAsync){
-		dojo.ready(0, function(){
+	if(!kernel.isAsync){
+		ready(0, function(){
 			var requires = ["dijit/layout/AccordionPane"];
 			require(requires);	// use indirection so modules not rolled into a build
 		});
